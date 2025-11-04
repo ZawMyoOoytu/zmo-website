@@ -1,0 +1,10 @@
+.page {
+  padding: 80px 0;
+  min-height: 80vh;
+}
+
+.container {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 0 20px;
+}

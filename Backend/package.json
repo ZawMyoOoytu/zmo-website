@@ -1,0 +1,55 @@
+{
+  "name": "zmo-backend",
+  "version": "1.0.0",
+  "description": "ZMO Backend API - Production Ready Backend for ZMO Website",
+  "main": "server.js",
+  "scripts": {
+    "dev": "nodemon server.js",
+    "start": "node server.js",
+    "vercel-build": "echo 'No build step needed for Node.js' && npm install",
+    "build": "echo 'No build process required for Node.js backend'",
+    "test": "echo 'No tests yet' && exit 0",
+    "lint": "echo 'No linter configured'",
+    "prod": "NODE_ENV=production node server.js",
+    "debug": "NODE_ENV=development node --inspect server.js"
+  },
+  "dependencies": {
+    "compression": "^1.8.1",
+    "cors": "^2.8.5",
+    "dotenv": "^16.3.1",
+    "express": "^4.18.2",
+    "express-rate-limit": "^6.11.2",
+    "helmet": "^7.2.0",
+    "mongoose": "^7.5.0"
+  },
+  "devDependencies": {
+    "nodemon": "^3.0.1"
+  },
+  "engines": {
+    "node": ">=16.0.0",
+    "npm": ">=8.0.0"
+  },
+  "keywords": [
+    "api",
+    "backend",
+    "vercel",
+    "express",
+    "mongodb",
+    "rest-api",
+    "production",
+    "zmo"
+  ],
+  "author": "ZMO Team",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/your-username/zmo-backend"
+  },
+  "bugs": {
+    "url": "https://github.com/your-username/zmo-backend/issues"
+  },
+  "homepage": "https://zmo-backend.vercel.app",
+  "volta": {
+    "node": "18.17.0"
+  }
+}
