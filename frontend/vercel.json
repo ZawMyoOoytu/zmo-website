@@ -1,9 +1,14 @@
 {
   "version": 2,
-  "name": "zmo-admin-panel",
+  "name": "zmo-frontend",
   "buildCommand": "npm run build",
   "outputDirectory": "build",
   "installCommand": "npm install",
+  "functions": {
+    "src/api/**/*.js": {
+      "maxDuration": 10
+    }
+  },
   "env": {
     "REACT_APP_API_URL": "https://zmo-backend.onrender.com",
     "REACT_APP_API_BASE_URL": "https://zmo-backend.onrender.com/api",
@@ -12,33 +17,12 @@
     "REACT_APP_ENV": "production",
     "REACT_APP_VERSION": "2.0.0",
     "REACT_APP_DEPLOYMENT_PLATFORM": "vercel",
-    "REACT_APP_BACKEND_PLATFORM": "render",
-    "REACT_APP_ANALYTICS_ENABLED": "true",
-    "REACT_APP_DEBUG_MODE": "false"
+    "REACT_APP_BACKEND_PLATFORM": "render"
   },
   "rewrites": [
     {
       "source": "/(.*)",
       "destination": "/index.html"
-    }
-  ],
-  "headers": [
-    {
-      "source": "/(.*)",
-      "headers": [
-        {
-          "key": "X-Content-Type-Options",
-          "value": "nosniff"
-        },
-        {
-          "key": "X-Frame-Options",
-          "value": "DENY"
-        },
-        {
-          "key": "X-XSS-Protection",
-          "value": "1; mode=block"
-        }
-      ]
     }
   ]
 }

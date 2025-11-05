@@ -4,28 +4,37 @@ const mongoose = require('mongoose');
 const helmet = require('helmet');
 const compression = require('compression');
 const rateLimit = require('express-rate-limit');
+const bcrypt = require('bcryptjs');
+const jwt = require('jsonwebtoken');
+const mongoSanitize = require('express-mongo-sanitize');
 require('dotenv').config();
 
-const connectDB = require('./config/database');
 const app = express();
 
 // ==========================================
-// 🚀 ENVIRONMENT CONFIGURATION
+// 🚀 RENDER-SPECIFIC CONFIGURATION
 // ==========================================
 const isProduction = process.env.NODE_ENV === 'production';
 const isDevelopment = process.env.NODE_ENV === 'development';
+const PORT = process.env.PORT || 5000;
+const RENDER_URL = process.env.RENDER_URL || `https://zmo-backend.onrender.com`;
+const NODE_ENV = process.env.NODE_ENV || 'development';
 
-console.log('🌍 Environment:', process.env.NODE_ENV || 'development');
-console.log('🚀 Starting in', isProduction ? 'PRODUCTION' : 'DEVELOPMENT', 'mode');
+console.log('🚀 Starting ZMO Backend Server on Render...');
+console.log('🌍 Environment:', NODE_ENV);
+console.log('🔧 Node Version:', process.version);
+console.log('📊 Process ID:', process.pid);
 
 // ==========================================
-// 🌐 CORS CONFIGURATION - FIXED FOR PRODUCTION
+// 🌐 ENHANCED CORS CONFIGURATION FOR RENDER
 // ==========================================
 const productionOrigins = [
   'https://zmo-admin.vercel.app',
   'https://zmo-frontend.vercel.app',
-  'https://zmo-backend.vercel.app',
-  'https://zmo-website.vercel.app'
+  'https://zmo-website.vercel.app',
+  'https://zmo-dashboard.vercel.app',
+  RENDER_URL,
+  'https://zmo-backend.onrender.com' // Your Render backend URL
 ];
 
 const developmentOrigins = [
@@ -33,17 +42,28 @@ const developmentOrigins = [
   'http://localhost:3001',
   'http://127.0.0.1:3000',
   'http://127.0.0.1:3001',
-  'http://localhost:5173', // Vite dev server
+  'http://localhost:5173',
+  'http://localhost:5174',
   ...productionOrigins // Include production URLs in development
 ];
 
 const allowedOrigins = isProduction ? productionOrigins : developmentOrigins;
 
-console.log('🌐 CORS Enabled for:', allowedOrigins);
+console.log('🌐 CORS Enabled for origins:', allowedOrigins);
 
-// ✅ FIXED CORS CONFIGURATION
-app.use(cors({
-  origin: allowedOrigins,
+// Enhanced CORS configuration
+const corsOptions = {
+  origin: function (origin, callback) {
+    // Allow requests with no origin (like mobile apps, postman, etc.)
+    if (!origin && isDevelopment) return callback(null, true);
+    
+    if (!origin || allowedOrigins.indexOf(origin) !== -1) {
+      callback(null, true);
+    } else {
+      console.log('🚫 CORS Blocked Origin:', origin);
+      callback(new Error(`Not allowed by CORS. Origin: ${origin}`));
+    }
+  },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
   allowedHeaders: [
@@ -54,39 +74,31 @@ app.use(cors({
     'x-environment',
     'X-Environment',
     'X-API-Key',
-    'Cache-Control'
-  ]
-}));
+    'Cache-Control',
+    'x-requested-with'
+  ],
+  exposedHeaders: ['X-Request-ID', 'X-API-Version', 'X-Token-Expiry']
+};
 
-// ✅ ENHANCED PRE-FLIGHT HANDLER
-app.options('*', (req, res) => {
-  const origin = req.headers.origin;
-  if (allowedOrigins.includes(origin)) {
-    res.header('Access-Control-Allow-Origin', origin);
-  }
-  res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS, PATCH');
-  res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With, Accept, x-environment, X-Environment, X-API-Key, Cache-Control');
-  res.header('Access-Control-Allow-Credentials', 'true');
-  res.status(200).send();
-});
+app.use(cors(corsOptions));
+
+// Handle pre-flight requests
+app.options('*', cors(corsOptions));
 
 // ==========================================
-// 🛡️ SECURITY MIDDLEWARE
+// 🛡️ ENHANCED SECURITY MIDDLEWARE
 // ==========================================
-
-// Helmet for security headers
 app.use(helmet({
   crossOriginResourcePolicy: { policy: "cross-origin" },
-  contentSecurityPolicy: false // Disabled for API, enable if serving HTML
+  contentSecurityPolicy: false
 }));
 
-// Compression for responses
 app.use(compression());
 
-// Rate limiting
+// Rate limiting - Adjusted for Render
 const limiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
-  max: isProduction ? 100 : 1000, // Limit each IP to 100 requests per windowMs in production
+  max: isProduction ? 200 : 1000, // Higher limits for Render
   message: {
     success: false,
     error: 'Too many requests',
@@ -98,11 +110,17 @@ const limiter = rateLimit({
 
 app.use(limiter);
 
+// MongoDB sanitization
+app.use(mongoSanitize());
+
 // ==========================================
-// 📊 BODY PARSING & SECURITY
+// 📊 BODY PARSING MIDDLEWARE
 // ==========================================
 app.use(express.json({ 
-  limit: '10mb'
+  limit: '10mb',
+  verify: (req, res, buf) => {
+    req.rawBody = buf;
+  }
 }));
 
 app.use(express.urlencoded({ 
@@ -111,73 +129,130 @@ app.use(express.urlencoded({
 }));
 
 // ==========================================
-// 🔧 CUSTOM SECURITY HEADERS
+// 🔧 CUSTOM MIDDLEWARE
 // ==========================================
 app.use((req, res, next) => {
-  // Additional security headers
+  const origin = req.headers.origin;
+  
+  // Set CORS headers dynamically
+  if (origin && allowedOrigins.includes(origin)) {
+    res.setHeader('Access-Control-Allow-Origin', origin);
+  }
+  
+  res.setHeader('Access-Control-Allow-Credentials', 'true');
   res.setHeader('X-Content-Type-Options', 'nosniff');
   res.setHeader('X-Frame-Options', 'DENY');
   res.setHeader('X-XSS-Protection', '1; mode=block');
   
-  // HSTS only in production
+  // Security headers for production
   if (isProduction) {
     res.setHeader('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
   }
   
-  // API version header
-  res.setHeader('X-API-Version', '1.0.0');
+  res.setHeader('X-API-Version', '2.0.0');
+  res.setHeader('X-Deployment-Platform', 'Render');
+  
+  next();
+});
+
+// Request logging middleware
+app.use((req, res, next) => {
+  const timestamp = new Date().toISOString();
+  req.requestId = Date.now().toString(36) + Math.random().toString(36).substr(2);
+  res.setHeader('X-Request-ID', req.requestId);
+
+  // Enhanced logging for Render
+  console.log(`📨 [${timestamp}] ${req.method} ${req.originalUrl}`, {
+    origin: req.headers.origin,
+    ip: req.ip || req.connection.remoteAddress,
+    'user-agent': req.headers['user-agent']?.substring(0, 30) + '...',
+    requestId: req.requestId
+  });
   
   next();
 });
 
 // ==========================================
-// 📝 REQUEST LOGGING MIDDLEWARE
+// 🗄️ MONGODB CONNECTION (Render Optimized)
 // ==========================================
-app.use((req, res, next) => {
-  const timestamp = new Date().toISOString();
-  
-  if (isDevelopment) {
-    console.log(`📨 [${timestamp}] ${req.method} ${req.url}`, {
-      origin: req.headers.origin,
-      ip: req.ip
+const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://localhost:27017/zmo-database';
+
+const connectDB = async () => {
+  try {
+    console.log('🔗 Connecting to MongoDB...');
+    
+    const conn = await mongoose.connect(MONGODB_URI, {
+      useNewUrlParser: true,
+      useUnifiedTopology: true,
+      serverSelectionTimeoutMS: 30000, // 30 seconds timeout for Render
+      socketTimeoutMS: 45000, // 45 seconds socket timeout
+      maxPoolSize: 10,
+      minPoolSize: 2,
+      retryWrites: true,
+      w: 'majority'
     });
+
+    console.log(`✅ MongoDB Connected: ${conn.connection.host}`);
+    console.log(`📊 Database: ${conn.connection.name}`);
+    
+    // Monitor connection events
+    mongoose.connection.on('error', (err) => {
+      console.error('❌ MongoDB connection error:', err);
+    });
+
+    mongoose.connection.on('disconnected', () => {
+      console.log('⚠️ MongoDB disconnected');
+    });
+
+    mongoose.connection.on('reconnected', () => {
+      console.log('🔁 MongoDB reconnected');
+    });
+
+  } catch (error) {
+    console.error('💥 MongoDB connection failed:', error.message);
+    console.log('🔄 Retrying connection in 5 seconds...');
+    setTimeout(connectDB, 5000);
   }
-  
-  // Add request ID for tracking
-  req.requestId = Date.now().toString(36) + Math.random().toString(36).substr(2);
-  res.setHeader('X-Request-ID', req.requestId);
-  
-  next();
-});
+};
 
 // ==========================================
 // 🏠 HEALTH & STATUS ENDPOINTS
 // ==========================================
-app.get('/api/health', (req, res) => {
+app.get('/api/health', async (req, res) => {
   try {
     const dbStatus = mongoose.connection.readyState;
     const statusText = ['disconnected', 'connected', 'connecting', 'disconnecting'][dbStatus];
+    const memoryUsage = process.memoryUsage();
     
     const healthData = {
-      status: 'OK',
-      message: `ZMO Backend Server is running in ${process.env.NODE_ENV} mode`,
-      database: statusText,
-      environment: process.env.NODE_ENV || 'development',
+      status: dbStatus === 1 ? 'OK' : 'WARNING',
+      message: `ZMO Backend Server running on Render in ${NODE_ENV} mode`,
+      database: {
+        status: statusText,
+        readyState: dbStatus
+      },
+      server: {
+        environment: NODE_ENV,
+        platform: 'Render',
+        nodeVersion: process.version,
+        uptime: process.uptime(),
+        memory: {
+          used: Math.round(memoryUsage.heapUsed / 1024 / 1024) + ' MB',
+          total: Math.round(memoryUsage.heapTotal / 1024 / 1024) + ' MB'
+        }
+      },
       timestamp: new Date().toISOString(),
-      version: '1.0.0',
-      nodeVersion: process.version,
-      uptime: process.uptime(),
-      memory: process.memoryUsage(),
+      requestId: req.requestId,
       cors: {
         enabled: true,
-        allowedOrigins: allowedOrigins
+        allowedOrigins: allowedOrigins.length
       }
     };
 
-    // Cache control for health endpoint
-    res.setHeader('Cache-Control', 'no-cache');
-    res.json(healthData);
+    res.setHeader('Cache-Control', 'no-cache, no-store');
+    res.status(dbStatus === 1 ? 200 : 503).json(healthData);
   } catch (error) {
+    console.error('Health check error:', error);
     res.status(500).json({
       status: 'ERROR',
       message: 'Server health check failed',
@@ -188,12 +263,12 @@ app.get('/api/health', (req, res) => {
 });
 
 app.get('/api/status', (req, res) => {
-  res.setHeader('Cache-Control', 'public, max-age=300'); // Cache for 5 minutes
   res.json({
     success: true,
-    service: 'ZMO Backend API',
+    service: 'ZMO Backend API on Render',
     status: 'operational',
-    environment: process.env.NODE_ENV,
+    environment: NODE_ENV,
+    deployment: 'Render',
     uptime: process.uptime(),
     timestamp: new Date().toISOString(),
     requestId: req.requestId
@@ -201,13 +276,13 @@ app.get('/api/status', (req, res) => {
 });
 
 // ==========================================
-// 🔐 AUTHENTICATION ENDPOINTS
+// 🔐 ENHANCED AUTHENTICATION SYSTEM
 // ==========================================
 
 // Rate limiting for auth endpoints
 const authLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: isProduction ? 5 : 10, // Limit auth attempts
+  windowMs: 15 * 60 * 1000,
+  max: isProduction ? 15 : 50,
   message: {
     success: false,
     error: 'Too many authentication attempts',
@@ -218,9 +293,45 @@ const authLimiter = rateLimit({
 app.use('/api/auth/login', authLimiter);
 app.use('/api/auth/register', authLimiter);
 
+// JWT Secret
+const JWT_SECRET = process.env.JWT_SECRET || 'zmo-render-backend-secret-key-2024';
+
+// Demo users database (in production, use real MongoDB)
+const demoUsers = [
+  {
+    id: 1,
+    name: 'Super Admin',
+    email: 'admin@zmo.com',
+    password: 'password', // Will be hashed
+    role: 'super_admin',
+    permissions: ['read', 'write', 'delete', 'admin', 'settings'],
+    avatar: null,
+    isActive: true,
+    lastLogin: null
+  },
+  {
+    id: 2,
+    name: 'Content Manager',
+    email: 'content@zmo.com',
+    password: 'demo123',
+    role: 'content_manager',
+    permissions: ['read', 'write'],
+    avatar: null,
+    isActive: true,
+    lastLogin: null
+  }
+];
+
+// Hash demo passwords (in real app, do this on user creation)
+demoUsers.forEach(user => {
+  user.password = bcrypt.hashSync(user.password, 10);
+});
+
+// Login endpoint
 app.post('/api/auth/login', async (req, res) => {
   try {
     console.log('🔐 Login attempt from:', req.headers.origin);
+    
     const { email, password } = req.body;
     
     // Input validation
@@ -232,59 +343,77 @@ app.post('/api/auth/login', async (req, res) => {
       });
     }
 
-    // Email validation
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(email)) {
-      return res.status(400).json({
-        success: false,
-        message: 'Invalid email format',
-        requestId: req.requestId
-      });
-    }
-
-    // Trim and sanitize
     const cleanEmail = email.trim().toLowerCase();
     const cleanPassword = password.trim();
 
-    // Demo authentication
-    if (cleanPassword === 'password') {
-      // Simulate database processing
-      await new Promise(resolve => setTimeout(resolve, 500));
-      
-      const userData = {
-        success: true,
-        token: `zmo-token-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-        user: { 
-          id: 1, 
-          name: 'Admin User', 
-          email: cleanEmail, 
-          role: 'admin',
-          avatar: null,
-          permissions: ['read', 'write', 'delete']
-        },
-        expiresIn: '24h',
-        requestId: req.requestId
-      };
+    console.log('🔑 Processing login for:', cleanEmail);
 
-      // Add demo message in development
-      if (isDevelopment) {
-        userData.demo_message = 'Use password "password" for demo access';
-      }
-
-      console.log('✅ Login successful for:', cleanEmail);
-      return res.json(userData);
-    } else {
-      console.log('❌ Login failed for:', cleanEmail);
+    // Find user in demo database
+    const user = demoUsers.find(u => u.email === cleanEmail && u.isActive);
+    
+    if (!user) {
+      console.log('❌ User not found:', cleanEmail);
       return res.status(401).json({ 
         success: false, 
-        message: isDevelopment 
-          ? 'Invalid credentials. Use password: "password"' 
-          : 'Invalid email or password',
+        message: 'Invalid email or password',
         requestId: req.requestId
       });
     }
+
+    // Verify password
+    const isPasswordValid = await bcrypt.compare(cleanPassword, user.password);
+    
+    if (!isPasswordValid) {
+      console.log('❌ Invalid password for:', cleanEmail);
+      return res.status(401).json({ 
+        success: false, 
+        message: 'Invalid email or password',
+        requestId: req.requestId
+      });
+    }
+
+    // Generate JWT token
+    const tokenPayload = {
+      userId: user.id,
+      email: user.email,
+      role: user.role,
+      permissions: user.permissions
+    };
+
+    const token = jwt.sign(tokenPayload, JWT_SECRET, { expiresIn: '24h' });
+
+    // Update last login
+    user.lastLogin = new Date().toISOString();
+
+    const userResponse = {
+      success: true,
+      token: token,
+      user: {
+        id: user.id,
+        name: user.name,
+        email: user.email,
+        role: user.role,
+        permissions: user.permissions,
+        avatar: user.avatar,
+        lastLogin: user.lastLogin
+      },
+      expiresIn: '24h',
+      requestId: req.requestId
+    };
+
+    // Add demo info in development
+    if (isDevelopment) {
+      userResponse.demo = {
+        note: 'This is a demo authentication system',
+        available_users: demoUsers.map(u => ({ email: u.email, role: u.role }))
+      };
+    }
+
+    console.log('✅ Login successful for:', cleanEmail);
+    
+    res.json(userResponse);
   } catch (error) {
-    console.error('Login error:', error);
+    console.error('💥 Login endpoint error:', error);
     res.status(500).json({
       success: false,
       message: 'Authentication service temporarily unavailable',
@@ -294,193 +423,158 @@ app.post('/api/auth/login', async (req, res) => {
   }
 });
 
-app.post('/api/auth/register', async (req, res) => {
+// Token verification middleware
+const authenticateToken = (req, res, next) => {
   try {
-    const { name, email, password } = req.body;
-    
-    if (!name || !email || !password) {
-      return res.status(400).json({
-        success: false,
-        message: 'Name, email and password are required',
-        requestId: req.requestId
-      });
-    }
+    const authHeader = req.headers['authorization'];
+    const token = authHeader && authHeader.split(' ')[1]; // Bearer TOKEN
 
-    // Password strength validation
-    if (password.length < 6) {
-      return res.status(400).json({
-        success: false,
-        message: 'Password must be at least 6 characters',
-        requestId: req.requestId
-      });
-    }
-
-    // Email validation
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(email)) {
-      return res.status(400).json({
-        success: false,
-        message: 'Invalid email format',
-        requestId: req.requestId
-      });
-    }
-
-    // Simulate user registration process
-    await new Promise(resolve => setTimeout(resolve, 1000));
-    
-    res.status(201).json({
-      success: true,
-      message: 'User registered successfully',
-      user: {
-        id: Date.now(),
-        name: name.trim(),
-        email: email.trim().toLowerCase(),
-        role: 'user',
-        createdAt: new Date().toISOString()
-      },
-      requestId: req.requestId
-    });
-  } catch (error) {
-    console.error('Registration error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Registration service temporarily unavailable',
-      requestId: req.requestId,
-      ...(isDevelopment && { error: error.message })
-    });
-  }
-});
-
-app.get('/api/auth/verify', async (req, res) => {
-  try {
-    const token = req.header('Authorization')?.replace('Bearer ', '');
-    
     if (!token) {
-      return res.status(401).json({ 
-        success: false, 
-        message: 'No authentication token provided',
-        requestId: req.requestId
-      });
-    }
-
-    // Demo token verification
-    await new Promise(resolve => setTimeout(resolve, 300));
-    
-    if (token.startsWith('zmo-token-') || token.startsWith('demo-token-')) {
-      return res.json({
-        success: true,
-        user: { 
-          id: 1, 
-          name: 'Admin User', 
-          email: 'admin@zmo.com', 
-          role: 'admin',
-          permissions: ['read', 'write', 'delete']
-        },
-        requestId: req.requestId
-      });
-    } else {
       return res.status(401).json({
         success: false,
-        message: 'Invalid or expired token',
+        message: 'Access token required',
         requestId: req.requestId
       });
     }
+
+    jwt.verify(token, JWT_SECRET, (err, decoded) => {
+      if (err) {
+        console.log('❌ Token verification failed:', err.message);
+        return res.status(403).json({
+          success: false,
+          message: 'Invalid or expired token',
+          requestId: req.requestId
+        });
+      }
+
+      req.user = decoded;
+      console.log('✅ Token verified for user:', decoded.email);
+      next();
+    });
   } catch (error) {
-    console.error('Token verification error:', error);
+    console.error('Token middleware error:', error);
     res.status(500).json({
       success: false,
-      message: 'Token verification service unavailable',
-      requestId: req.requestId,
-      ...(isDevelopment && { error: error.message })
+      message: 'Authentication failed',
+      requestId: req.requestId
     });
   }
-});
+};
 
-app.post('/api/auth/logout', (req, res) => {
+// Token verification endpoint
+app.get('/api/auth/verify', authenticateToken, (req, res) => {
+  const user = demoUsers.find(u => u.id === req.user.userId);
+  
+  if (!user) {
+    return res.status(404).json({
+      success: false,
+      message: 'User not found',
+      requestId: req.requestId
+    });
+  }
+
   res.json({
     success: true,
-    message: 'Logged out successfully',
+    user: {
+      id: user.id,
+      name: user.name,
+      email: user.email,
+      role: user.role,
+      permissions: user.permissions,
+      avatar: user.avatar,
+      lastLogin: user.lastLogin
+    },
     requestId: req.requestId
   });
 });
 
+// Logout endpoint
+app.post('/api/auth/logout', authenticateToken, (req, res) => {
+  console.log('👋 Logout request from:', req.user.email);
+  
+  res.json({
+    success: true,
+    message: 'Logged out successfully',
+    requestId: req.requestId,
+    timestamp: new Date().toISOString()
+  });
+});
+
 // ==========================================
-// 📊 ADMIN DASHBOARD ENDPOINTS
+// 📊 PROTECTED ADMIN ENDPOINTS
 // ==========================================
-app.get('/api/admin/dashboard/stats', async (req, res) => {
+
+// Dashboard stats
+app.get('/api/admin/dashboard/stats', authenticateToken, async (req, res) => {
   try {
+    console.log('📊 Dashboard request from:', req.user.email);
+    
     // Simulate database query
-    await new Promise(resolve => setTimeout(resolve, 600));
+    await new Promise(resolve => setTimeout(resolve, 800));
     
     const stats = {
       success: true,
       data: {
-        totalBlogs: 12,
-        totalProjects: 8,
-        totalMessages: 25,
-        totalUsers: 5,
-        monthlyVisitors: 1245,
-        revenue: 28450,
-        performance: 87.5,
+        totalBlogs: 24,
+        totalProjects: 15,
+        totalMessages: 42,
+        totalUsers: 8,
+        monthlyVisitors: 2845,
+        revenue: 45200,
+        performance: 92.5,
+        server: {
+          status: 'healthy',
+          responseTime: '125ms',
+          uptime: process.uptime()
+        },
         recentActivities: [
           { 
             id: 1, 
-            action: 'Blog published', 
-            user: 'Admin', 
+            action: 'New blog published', 
+            user: req.user.name, 
             time: '2 hours ago',
             type: 'blog',
             icon: '📝'
           },
           { 
             id: 2, 
-            action: 'New message received', 
-            user: 'John Doe', 
+            action: 'Project completed', 
+            user: 'Content Team', 
             time: '5 hours ago',
-            type: 'message',
-            icon: '📧'
-          },
-          { 
-            id: 3, 
-            action: 'Project updated', 
-            user: 'Admin', 
-            time: '1 day ago',
             type: 'project',
             icon: '🚀'
           }
         ],
         chartData: {
-          labels: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun'],
-          visitors: [65, 59, 80, 81, 56, 55],
-          revenue: [28, 48, 40, 19, 86, 27],
-          projects: [5, 8, 12, 6, 15, 10]
+          labels: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul'],
+          visitors: [65, 59, 80, 81, 56, 55, 70],
+          revenue: [28, 48, 40, 19, 86, 27, 45],
+          projects: [5, 8, 12, 6, 15, 10, 8]
         }
       },
       requestId: req.requestId,
-      cached: false
+      user: req.user,
+      timestamp: new Date().toISOString()
     };
 
-    // Cache control for dashboard data
-    res.setHeader('Cache-Control', 'private, max-age=300'); // 5 minutes cache
+    res.setHeader('Cache-Control', 'private, max-age=300');
     res.json(stats);
   } catch (error) {
     console.error('Dashboard stats error:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to fetch dashboard statistics',
-      requestId: req.requestId,
-      ...(isDevelopment && { error: error.message })
+      requestId: req.requestId
     });
   }
 });
 
-// ==========================================
-// 📝 BLOG MANAGEMENT ENDPOINTS
-// ==========================================
-app.get('/api/admin/blogs', async (req, res) => {
+// Blog management endpoints
+app.get('/api/admin/blogs', authenticateToken, async (req, res) => {
   try {
     const { page = 1, limit = 10, search } = req.query;
     
-    await new Promise(resolve => setTimeout(resolve, 400));
+    await new Promise(resolve => setTimeout(resolve, 500));
     
     const blogsData = {
       success: true,
@@ -488,47 +582,23 @@ app.get('/api/admin/blogs', async (req, res) => {
         blogs: [
           {
             id: 1,
-            title: 'Getting Started with React',
-            excerpt: 'Learn the basics of React development and build your first application.',
-            content: 'Full content here...',
+            title: 'Getting Started with React on Render',
+            excerpt: 'Learn how to deploy React applications on Render platform.',
             status: 'published',
-            author: 'Admin User',
-            tags: ['react', 'javascript', 'frontend'],
+            author: req.user.name,
+            tags: ['react', 'render', 'deployment'],
             featured: true,
             createdAt: '2024-01-15T10:30:00Z',
-            updatedAt: '2024-01-15T10:30:00Z',
-            publishedAt: '2024-01-15T10:30:00Z',
             views: 1245,
             likes: 89,
             readTime: 5
-          },
-          {
-            id: 2,
-            title: 'Node.js Best Practices',
-            excerpt: 'Essential practices and patterns for Node.js development in production.',
-            content: 'Full content here...',
-            status: 'draft',
-            author: 'Admin User',
-            tags: ['nodejs', 'backend', 'javascript'],
-            featured: false,
-            createdAt: '2024-01-14T14:20:00Z',
-            updatedAt: '2024-01-16T09:15:00Z',
-            views: 0,
-            likes: 0,
-            readTime: 8
           }
         ],
         pagination: {
-          total: 12,
+          total: 24,
           page: parseInt(page),
           limit: parseInt(limit),
-          pages: 2,
-          hasNext: true,
-          hasPrev: false
-        },
-        filters: {
-          search: search || '',
-          status: 'all'
+          pages: 3
         }
       },
       requestId: req.requestId
@@ -540,185 +610,56 @@ app.get('/api/admin/blogs', async (req, res) => {
     res.status(500).json({
       success: false,
       message: 'Failed to fetch blogs',
-      requestId: req.requestId,
-      ...(isDevelopment && { error: error.message })
-    });
-  }
-});
-
-// ==========================================
-// 🛠️ PROJECT MANAGEMENT ENDPOINTS
-// ==========================================
-app.get('/api/admin/projects', async (req, res) => {
-  try {
-    await new Promise(resolve => setTimeout(resolve, 300));
-    
-    res.json({
-      success: true,
-      data: {
-        projects: [
-          {
-            id: 1,
-            name: 'E-commerce Platform',
-            description: 'Full-stack e-commerce solution with React and Node.js',
-            status: 'completed',
-            client: 'Tech Corp',
-            progress: 100,
-            budget: 15000,
-            spent: 14200,
-            deadline: '2024-02-01',
-            startDate: '2024-01-01',
-            team: ['John Doe', 'Jane Smith', 'Mike Johnson'],
-            technologies: ['React', 'Node.js', 'MongoDB', 'Stripe'],
-            repoUrl: 'https://github.com/zmo/ecommerce-platform',
-            liveUrl: 'https://ecommerce-techcorp.com'
-          },
-          {
-            id: 2,
-            name: 'Mobile App Development',
-            description: 'Cross-platform mobile application for task management',
-            status: 'in-progress',
-            client: 'Startup Inc',
-            progress: 75,
-            budget: 20000,
-            spent: 15600,
-            deadline: '2024-03-15',
-            startDate: '2024-01-10',
-            team: ['Admin User', 'Mike Johnson', 'Sarah Wilson'],
-            technologies: ['React Native', 'Firebase', 'Redux'],
-            repoUrl: 'https://github.com/zmo/mobile-app',
-            liveUrl: null
-          }
-        ],
-        stats: {
-          total: 8,
-          completed: 3,
-          inProgress: 4,
-          planning: 1
-        }
-      },
       requestId: req.requestId
     });
-  } catch (error) {
-    console.error('Projects fetch error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Failed to fetch projects',
-      requestId: req.requestId,
-      ...(isDevelopment && { error: error.message })
-    });
   }
 });
 
 // ==========================================
-// 📧 CONTACT MESSAGES ENDPOINTS
-// ==========================================
-app.get('/api/admin/contacts', async (req, res) => {
-  try {
-    const { status, page = 1 } = req.query;
-    
-    await new Promise(resolve => setTimeout(resolve, 200));
-    
-    res.json({
-      success: true,
-      data: {
-        messages: [
-          {
-            id: 1,
-            name: 'John Doe',
-            email: 'john@example.com',
-            phone: '+1234567890',
-            subject: 'Partnership Inquiry',
-            message: 'I would like to discuss potential partnership opportunities for our upcoming project. We are impressed with your portfolio and believe we can create something great together.',
-            status: 'new',
-            priority: 'high',
-            createdAt: '2024-01-20T09:15:00Z',
-            read: false,
-            source: 'website-form'
-          },
-          {
-            id: 2,
-            name: 'Jane Smith',
-            email: 'jane@example.com',
-            phone: '+0987654321',
-            subject: 'Support Request',
-            message: 'I need help with my account setup. I\'ve been trying to access the dashboard but keep getting error messages. Can you please assist?',
-            status: 'replied',
-            priority: 'medium',
-            createdAt: '2024-01-19T14:30:00Z',
-            read: true,
-            repliedAt: '2024-01-19T16:45:00Z',
-            source: 'email'
-          }
-        ],
-        pagination: {
-          total: 25,
-          page: parseInt(page),
-          limit: 10,
-          pages: 3
-        },
-        filters: {
-          status: status || 'all'
-        },
-        stats: {
-          total: 25,
-          new: 5,
-          replied: 15,
-          archived: 5
-        }
-      },
-      requestId: req.requestId
-    });
-  } catch (error) {
-    console.error('Contacts fetch error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Failed to fetch contact messages',
-      requestId: req.requestId,
-      ...(isDevelopment && { error: error.message })
-    });
-  }
-});
-
-// ==========================================
-// 🌐 ROOT & API DOCUMENTATION
+// 🌐 ROOT ENDPOINT
 // ==========================================
 app.get('/', (req, res) => {
   const apiInfo = {
     success: true,
-    message: '🚀 Welcome to ZMO Backend API',
-    version: '1.0.0',
-    environment: process.env.NODE_ENV || 'development',
+    message: '🚀 ZMO Backend API - Deployed on Render',
+    version: '2.0.0',
+    environment: NODE_ENV,
+    deployment: 'Render',
     timestamp: new Date().toISOString(),
     requestId: req.requestId,
-    endpoints: {
-      health: {
-        method: 'GET',
-        path: '/api/health',
-        description: 'Server health check'
+    status: 'operational',
+    features: [
+      'JWT Authentication',
+      'MongoDB Integration',
+      'CORS Enabled',
+      'Rate Limiting',
+      'Helmet Security',
+      'Admin Dashboard'
+    ],
+    demo: {
+      login: {
+        email: 'admin@zmo.com',
+        password: 'password'
       },
+      note: 'Use the credentials above for demo access'
+    },
+    endpoints: {
+      health: 'GET /api/health',
       auth: {
-        login: { method: 'POST', path: '/api/auth/login' },
-        register: { method: 'POST', path: '/api/auth/register' },
-        verify: { method: 'GET', path: '/api/auth/verify' },
-        logout: { method: 'POST', path: '/api/auth/logout' }
+        login: 'POST /api/auth/login',
+        verify: 'GET /api/auth/verify',
+        logout: 'POST /api/auth/logout'
       },
       admin: {
-        dashboard: { method: 'GET', path: '/api/admin/dashboard/stats' },
-        blogs: { method: 'GET', path: '/api/admin/blogs' },
-        projects: { method: 'GET', path: '/api/admin/projects' },
-        contacts: { method: 'GET', path: '/api/admin/contacts' }
+        dashboard: 'GET /api/admin/dashboard/stats',
+        blogs: 'GET /api/admin/blogs'
       }
     },
     documentation: 'https://docs.zmo.com/api',
-    support: 'support@zmo.com',
-    rate_limits: {
-      general: '100 requests per 15 minutes',
-      auth: '5 requests per 15 minutes'
-    }
+    support: 'Check Render logs for detailed debugging'
   };
 
-  res.setHeader('Cache-Control', 'public, max-age=3600'); // Cache for 1 hour
+  res.setHeader('Cache-Control', 'public, max-age=3600');
   res.json(apiInfo);
 });
 
@@ -726,26 +667,17 @@ app.get('/', (req, res) => {
 // 🔧 ERROR HANDLING MIDDLEWARE
 // ==========================================
 
-// 404 Handler for API routes
+// 404 Handler
 app.use('/api/*', (req, res) => {
+  console.log('❌ 404 - API route not found:', req.originalUrl);
+  
   res.status(404).json({
     success: false,
     error: 'Endpoint not found',
     message: `API route ${req.originalUrl} does not exist`,
     timestamp: new Date().toISOString(),
     requestId: req.requestId,
-    suggested: 'Check / for available endpoints'
-  });
-});
-
-// Global wildcard handler
-app.use('*', (req, res) => {
-  res.status(404).json({
-    success: false,
-    error: 'Route not found',
-    message: `Route ${req.originalUrl} does not exist on this server`,
-    timestamp: new Date().toISOString(),
-    requestId: req.requestId
+    method: req.method
   });
 });
 
@@ -756,7 +688,6 @@ app.use((error, req, res, next) => {
   console.error('💥 Global Error Handler:', {
     errorId,
     message: error.message,
-    stack: error.stack,
     url: req.url,
     method: req.method,
     origin: req.headers.origin,
@@ -770,43 +701,22 @@ app.use((error, req, res, next) => {
       error: 'CORS Error',
       message: 'Request blocked by CORS policy',
       requestId: req.requestId,
-      errorId
+      errorId,
+      allowedOrigins: allowedOrigins,
+      yourOrigin: req.headers.origin
     });
   }
 
-  // MongoDB error
-  if (error.name === 'MongoError' || error.name === 'MongoNetworkError') {
-    return res.status(503).json({
-      success: false,
-      error: 'Database Error',
-      message: 'Database service temporarily unavailable',
-      requestId: req.requestId,
-      errorId
-    });
-  }
-
-  // Rate limit error (handled by express-rate-limit)
-  if (error.status === 429) {
-    return res.status(429).json({
-      success: false,
-      error: 'Rate Limit Exceeded',
-      message: 'Too many requests, please try again later',
-      requestId: req.requestId,
-      errorId
-    });
-  }
-
-  // Default error response
   const errorResponse = {
     success: false,
     error: 'Internal Server Error',
     message: isProduction ? 'Something went wrong' : error.message,
     requestId: req.requestId,
     errorId,
-    timestamp: new Date().toISOString()
+    timestamp: new Date().toISOString(),
+    deployment: 'Render'
   };
 
-  // Include stack trace in development
   if (isDevelopment) {
     errorResponse.stack = error.stack;
   }
@@ -815,82 +725,72 @@ app.use((error, req, res, next) => {
 });
 
 // ==========================================
-// 🚀 SERVER STARTUP & GRACEFUL SHUTDOWN
+// 🚀 SERVER STARTUP (Render Optimized)
 // ==========================================
 const startServer = async () => {
   try {
-    console.log('🚀 Starting ZMO Backend Server...');
-    console.log('📁 Environment:', process.env.NODE_ENV || 'development');
-    console.log('🔧 Node Version:', process.version);
-    console.log('⏰ Startup Time:', new Date().toISOString());
-
-    // Connect to MongoDB
+    // Connect to MongoDB first
     await connectDB();
-    console.log('✅ MongoDB connected successfully!');
-
-    // Start Express server
-    const PORT = process.env.PORT || 5000;
+    
+    // Start server
     const server = app.listen(PORT, '0.0.0.0', () => {
-      console.log(`🎯 Server running on port ${PORT}`);
-      console.log(`🌐 Health check: http://localhost:${PORT}/api/health`);
-      console.log(`📚 API Documentation: http://localhost:${PORT}/`);
-      console.log(`🔒 Environment: ${isProduction ? 'PRODUCTION' : 'DEVELOPMENT'}`);
-      console.log(`🌐 CORS Enabled for: ${allowedOrigins.join(', ')}`);
+      console.log('\n🎉 ==========================================');
+      console.log('🚀 ZMO Backend Server Started Successfully!');
+      console.log('🎯 ==========================================');
+      console.log(`📍 Port: ${PORT}`);
+      console.log(`🌍 Environment: ${NODE_ENV}`);
+      console.log(`🏢 Platform: Render`);
+      console.log(`🔗 MongoDB: ${mongoose.connection.readyState === 1 ? 'Connected' : 'Disconnected'}`);
+      console.log(`🌐 CORS: Enabled for ${allowedOrigins.length} origins`);
+      console.log(`🛡️ Security: Rate limiting, Helmet, CORS`);
+      console.log(`📊 Demo Login: admin@zmo.com / password`);
+      console.log('==========================================\n');
       
-      if (isProduction) {
-        console.log('🛡️  Production mode enabled with enhanced security');
-      }
+      // Log important URLs
+      console.log('🔗 Important URLs:');
+      console.log(`   Health Check: ${RENDER_URL}/api/health`);
+      console.log(`   API Documentation: ${RENDER_URL}/`);
+      console.log(`   Render Dashboard: https://render.com/dashboard`);
     });
 
-    // Graceful shutdown handler
+    // Graceful shutdown for Render
     const gracefulShutdown = (signal) => {
       return () => {
-        console.log(`\n🛑 Received ${signal}, closing server gracefully...`);
+        console.log(`\n🛑 Received ${signal}, starting graceful shutdown...`);
         
         server.close(() => {
           console.log('✅ HTTP server closed.');
           
-          mongoose.connection.close(false, () => {
-            console.log('✅ MongoDB connection closed.');
+          if (mongoose.connection.readyState === 1) {
+            mongoose.connection.close(false, () => {
+              console.log('✅ MongoDB connection closed.');
+              console.log('👋 Server shutdown completed.');
+              process.exit(0);
+            });
+          } else {
             console.log('👋 Server shutdown completed.');
             process.exit(0);
-          });
+          }
         });
 
-        // Force close after 10 seconds
+        // Force shutdown after 8 seconds
         setTimeout(() => {
           console.log('❌ Forcing server shutdown...');
           process.exit(1);
-        }, 10000);
+        }, 8000);
       };
     };
 
-    // Handle various shutdown signals
     process.on('SIGTERM', gracefulShutdown('SIGTERM'));
     process.on('SIGINT', gracefulShutdown('SIGINT'));
-    process.on('SIGUSR2', gracefulShutdown('SIGUSR2')); // For nodemon
-
-    // Handle uncaught exceptions
-    process.on('uncaughtException', (error) => {
-      console.error('💥 Uncaught Exception:', error);
-      process.exit(1);
-    });
-
-    process.on('unhandledRejection', (reason, promise) => {
-      console.error('💥 Unhandled Rejection at:', promise, 'reason:', reason);
-      process.exit(1);
-    });
 
   } catch (error) {
-    console.error('❌ Server failed to start:', error);
+    console.error('💥 Server failed to start:', error);
     process.exit(1);
   }
 };
 
 // Start the server
-if (require.main === module) {
-  startServer();
-}
+startServer();
 
-// Export app for Vercel
 module.exports = app;
