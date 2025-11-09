@@ -2,24 +2,44 @@
   "version": 2,
   "name": "zmo-admin-panel",
   "buildCommand": "npm run build",
-  "outputDirectory": "build",
+  "outputDirectory": "dist",
   "installCommand": "npm install",
-  "env": {
-    "REACT_APP_API_URL": "https://zmo-backend.onrender.com",
-    "REACT_APP_API_BASE_URL": "https://zmo-backend.onrender.com/api",
-    "REACT_APP_ADMIN_URL": "https://zmo-admin.vercel.app",
-    "REACT_APP_FRONTEND_URL": "https://zmo-frontend.vercel.app",
-    "REACT_APP_ENV": "production",
-    "REACT_APP_VERSION": "2.0.0",
-    "REACT_APP_DEPLOYMENT_PLATFORM": "vercel",
-    "REACT_APP_BACKEND_PLATFORM": "render",
-    "REACT_APP_ANALYTICS_ENABLED": "true",
-    "REACT_APP_DEBUG_MODE": "false"
+  "framework": "vite",
+  "functions": {
+    "**/*.js": {
+      "maxDuration": 30
+    }
   },
-  "rewrites": [
+  "env": {
+    "VITE_API_BASE_URL": "https://zmo-backend.onrender.com/api",
+    "VITE_API_URL": "https://zmo-backend.onrender.com",
+    "VITE_ADMIN_URL": "https://zmo-admin.vercel.app",
+    "VITE_FRONTEND_URL": "https://zmo-frontend.vercel.app",
+    "VITE_APP_ENV": "production",
+    "VITE_APP_VERSION": "2.0.0",
+    "VITE_DEPLOYMENT_PLATFORM": "vercel",
+    "VITE_BACKEND_PLATFORM": "render",
+    "VITE_ANALYTICS_ENABLED": "true",
+    "VITE_DEBUG_MODE": "false",
+    "VITE_ADMIN_TITLE": "ZMO Admin Dashboard"
+  },
+  "build": {
+    "env": {
+      "VITE_API_BASE_URL": "https://zmo-backend.onrender.com/api",
+      "VITE_APP_ENV": "production"
+    }
+  },
+  "routes": [
     {
-      "source": "/(.*)",
-      "destination": "/index.html"
+      "src": "/assets/(.*)",
+      "headers": {
+        "cache-control": "public, immutable, max-age=31536000"
+      },
+      "continue": true
+    },
+    {
+      "src": "/(.*)",
+      "dest": "/index.html"
     }
   ],
   "headers": [
@@ -37,8 +57,32 @@
         {
           "key": "X-XSS-Protection",
           "value": "1; mode=block"
+        },
+        {
+          "key": "Referrer-Policy",
+          "value": "origin-when-cross-origin"
+        },
+        {
+          "key": "Permissions-Policy",
+          "value": "camera=(), microphone=(), geolocation=()"
         }
       ]
+    },
+    {
+      "source": "/assets/(.*)",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "public, immutable, max-age=31536000"
+        }
+      ]
+    }
+  ],
+  "redirects": [
+    {
+      "source": "/",
+      "destination": "/dashboard",
+      "permanent": false
     }
   ]
 }

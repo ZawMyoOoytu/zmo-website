@@ -1,176 +1,233 @@
-// admin-panel/src/components/login.js
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { useAuth } from '../../contexts/AuthContext';
-import { healthAPI } from '../../services/api';
+import { useAuth } from '../contexts/AuthContext';
+import './Login.css';
 
-const Login = () => {
-  const [formData, setFormData] = useState({ email: '', password: '' });
-  const [loadingForm, setLoadingForm] = useState(false);
+export default function Login() {
+  const { 
+    login, 
+    backendStatus, 
+    checkConnection, 
+    authLoading, 
+    loading: appLoading 
+  } = useAuth();
+  
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const [error, setError] = useState('');
-  const [backendStatus, setBackendStatus] = useState('unknown');
+  const [rememberMe, setRememberMe] = useState(false);
+  const [connectionTested, setConnectionTested] = useState(false);
 
-  const { login } = useAuth();
-  const navigate = useNavigate();
-
-  // Check backend connection on mount
+  // Test connection on component mount
   useEffect(() => {
-    checkBackendConnection();
-  }, []);
+    const testConnection = async () => {
+      if (!appLoading) {
+        await checkConnection();
+        setConnectionTested(true);
+      }
+    };
+    
+    testConnection();
+  }, [appLoading, checkConnection]);
 
-  const checkBackendConnection = async () => {
-    try {
-      const health = await healthAPI.check();
-      setBackendStatus('connected');
-      console.log('✅ Backend connection successful:', health);
-    } catch (err) {
-      setBackendStatus('disconnected');
-      console.error('❌ Backend connection failed:', err.message);
-    }
-  };
-
-  const handleSubmit = async (e) => {
+  const handleLogin = async (e) => {
     e.preventDefault();
-    setLoadingForm(true);
     setError('');
 
-    if (!formData.email || !formData.password) {
-      setError('Please fill in all fields');
-      setLoadingForm(false);
+    // Basic validation
+    if (!email.trim() || !password.trim()) {
+      setError('Please enter both email and password');
       return;
     }
 
     try {
-      console.log('🔄 Attempting login with:', { email: formData.email });
-
-      // Call AuthContext login
-      await login(formData.email, formData.password);
-
-      console.log('✅ Login successful');
-      navigate('/dashboard'); // Navigate without full page reload
-
+      await login(email, password, rememberMe);
+      // Redirect will happen automatically via protected routes
     } catch (err) {
-      console.error('❌ Login failed:', err);
-
-      if (err.response?.status === 401) {
-        setError('Invalid email or password');
-      } else if (err.response?.status === 404) {
-        setError('Login endpoint not found');
-      } else if (err.message.includes('Network Error')) {
-        setError('Cannot connect to backend. Check your server.');
-      } else {
-        setError(err.response?.data?.message || 'Login failed. Try again.');
-      }
-    } finally {
-      setLoadingForm(false);
+      setError(err.message);
     }
   };
 
-  const testBackendConnection = async () => {
-    try {
-      const health = await healthAPI.check();
-      alert(`✅ Backend connected!\nStatus: ${health.status}\nEnv: ${health.environment || 'N/A'}`);
-    } catch (err) {
-      alert(`❌ Backend connection failed!\nError: ${err.message}`);
+  const retryConnection = async () => {
+    setError('');
+    setConnectionTested(false);
+    const result = await checkConnection();
+    setConnectionTested(true);
+    
+    if (!result.success) {
+      setError('Still cannot connect to backend. Please check if the server is running.');
     }
   };
+
+  const fillDemoCredentials = () => {
+    setEmail('admin@zmo.com');
+    setPassword('password');
+    setRememberMe(true);
+  };
+
+  if (appLoading) {
+    return (
+      <div className="login-page">
+        <div className="login-container">
+          <div className="loading-state">
+            <div className="spinner"></div>
+            <p>Loading application...</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
-    <div className="login-container">
-      <form onSubmit={handleSubmit}>
-        <h2>Admin Login</h2>
-
-        {/* Backend Status Indicator */}
-        <div
-          style={{
-            padding: '8px',
-            marginBottom: '15px',
-            borderRadius: '4px',
-            backgroundColor:
-              backendStatus === 'connected'
-                ? '#d4edda'
-                : backendStatus === 'disconnected'
-                ? '#f8d7da'
-                : '#fff3cd',
-            color:
-              backendStatus === 'connected'
-                ? '#155724'
-                : backendStatus === 'disconnected'
-                ? '#721c24'
-                : '#856404',
-            textAlign: 'center',
-            fontSize: '14px',
-          }}
-        >
-          Backend Status:{' '}
-          <strong>
-            {backendStatus === 'connected'
-              ? '✅ Connected'
-              : backendStatus === 'disconnected'
-              ? '❌ Disconnected'
-              : '🔄 Checking...'}
-          </strong>
-        </div>
-
-        {error && (
-          <div
-            style={{
-              background: '#f8d7da',
-              color: '#721c24',
-              padding: '10px',
-              borderRadius: '4px',
-              marginBottom: '15px',
-              border: '1px solid #f5c6cb',
-            }}
-          >
-            {error}
+    <div className="login-page">
+      <div className="login-container">
+        <h1>Admin Login</h1>
+        
+        {/* Connection Status */}
+        {connectionTested && (
+          <div className={`connection-status ${backendStatus}`}>
+            {backendStatus === 'connected' && '✅ Backend connected'}
+            {backendStatus === 'disconnected' && '❌ Backend not available'}
+            {backendStatus === 'checking' && '🔄 Checking connection...'}
           </div>
         )}
 
-        <div className="form-group">
-          <label>Email:</label>
-          <input
-            type="email"
-            value={formData.email}
-            onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-            required
-            disabled={loadingForm}
-          />
+        {/* Error Message */}
+        {error && (
+          <div className="error-message">
+            <strong>Error:</strong> {error}
+            {backendStatus === 'disconnected' && (
+              <button onClick={retryConnection} className="retry-btn">
+                Retry Connection
+              </button>
+            )}
+          </div>
+        )}
+
+        <form onSubmit={handleLogin}>
+          <div className="form-group">
+            <label>Email Address</label>
+            <input
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              required
+              disabled={authLoading || backendStatus === 'disconnected'}
+              placeholder="Enter your email"
+              className={error && !email ? 'error' : ''}
+            />
+          </div>
+
+          <div className="form-group">
+            <label>Password</label>
+            <input
+              type="password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              required
+              disabled={authLoading || backendStatus === 'disconnected'}
+              placeholder="Enter your password"
+              className={error && !password ? 'error' : ''}
+            />
+          </div>
+
+          <div className="form-options">
+            <label className="checkbox-label">
+              <input
+                type="checkbox"
+                checked={rememberMe}
+                onChange={(e) => setRememberMe(e.target.checked)}
+                disabled={authLoading}
+              />
+              <span>Remember me</span>
+            </label>
+          </div>
+
+          <button 
+            className={`login-btn ${authLoading ? 'loading' : ''}`} 
+            type="submit" 
+            disabled={authLoading || backendStatus === 'disconnected'}
+          >
+            {authLoading ? (
+              <>
+                <span className="btn-spinner"></span>
+                Authenticating...
+              </>
+            ) : (
+              'Login to Dashboard'
+            )}
+          </button>
+        </form>
+
+        {/* Demo Helper */}
+        <div className="demo-section">
+          <button 
+            type="button" 
+            className="demo-btn"
+            onClick={fillDemoCredentials}
+            disabled={authLoading}
+          >
+            Fill Demo Credentials
+          </button>
+          
+          <div className="demo-credentials">
+            <p><strong>Demo Access:</strong></p>
+            <p>Email: <code>admin@zmo.com</code></p>
+            <p>Password: <code>password</code></p>
+          </div>
         </div>
 
-        <div className="form-group">
-          <label>Password:</label>
-          <input
-            type="password"
-            value={formData.password}
-            onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-            required
-            disabled={loadingForm}
-          />
+        {/* Troubleshooting Guide */}
+        {backendStatus === 'disconnected' && (
+          <div className="troubleshooting">
+            <h3>🚫 Connection Issues?</h3>
+            <p>Your frontend cannot connect to the backend server.</p>
+            
+            <div className="troubleshooting-steps">
+              <h4>Quick Checks:</h4>
+              <ol>
+                <li>
+                  <strong>Test Backend Directly:</strong>{' '}
+                  <a 
+                    href="https://zmo-backend.onrender.com/api/health" 
+                    target="_blank" 
+                    rel="noopener noreferrer"
+                  >
+                    Check if backend is running
+                  </a>
+                </li>
+                <li>
+                  <strong>Check Render Dashboard:</strong>{' '}
+                  <a 
+                    href="https://render.com/dashboard" 
+                    target="_blank" 
+                    rel="noopener noreferrer"
+                  >
+                    View service status
+                  </a>
+                </li>
+                <li>
+                  <strong>Wait and Retry:</strong> Render services can take a few minutes to start
+                </li>
+                <li>
+                  <strong>Check Console:</strong> Open browser dev tools for detailed errors
+                </li>
+              </ol>
+            </div>
+
+            <div className="backend-info">
+              <p><strong>Backend URL:</strong> <code>https://zmo-backend.onrender.com</code></p>
+              <p><strong>API Health Check:</strong> <code>/api/health</code></p>
+              <p><strong>Login Endpoint:</strong> <code>/api/auth/login</code></p>
+            </div>
+          </div>
+        )}
+
+        {/* App Info */}
+        <div className="app-info">
+          <p>ZMO Admin Panel v2.0.0</p>
+          <p>Environment: {process.env.NODE_ENV || 'development'}</p>
         </div>
-
-        <button
-          type="submit"
-          disabled={loadingForm}
-          style={{ width: '100%', marginBottom: '10px' }}
-        >
-          {loadingForm ? '🔄 Logging in...' : '🔑 Login'}
-        </button>
-
-        <button
-          type="button"
-          onClick={testBackendConnection}
-          style={{
-            width: '100%',
-            backgroundColor: '#6c757d',
-            border: '1px solid #6c757d',
-          }}
-        >
-          Test Backend Connection
-        </button>
-      </form>
+      </div>
     </div>
   );
-};
-
-export default Login;
+}

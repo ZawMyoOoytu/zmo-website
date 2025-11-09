@@ -1,9 +1,9 @@
 import React, { useState } from 'react';
-import { authAPI } from '../services/api';
+import { useAuth } from '../contexts/AuthContext';
 import '../components/auth/Login.css';
 
-
 export default function LoginPage() {
+  const { login } = useAuth(); // use AuthContext
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
@@ -13,18 +13,16 @@ export default function LoginPage() {
     e.preventDefault();
     setError('');
     setLoading(true);
+
     try {
-      const data = await authAPI.login(email, password);
-      if (data.success && data.token) {
-        localStorage.setItem('adminToken', data.token);
-        localStorage.setItem('adminUser', JSON.stringify(data.user));
-        window.location.href = '/dashboard';
-      } else {
-        setError(data.message || 'Login failed');
-      }
+      const data = await login(email, password); // call AuthContext login
+      console.log('Login success:', data);
+
+      // Redirect after login
+      window.location.href = '/'; // dashboard/home protected route
     } catch (err) {
       console.error('Login error:', err);
-      setError('Login failed. Check your credentials.');
+      setError(err.message || 'Login failed. Check your credentials.');
     } finally {
       setLoading(false);
     }
@@ -38,22 +36,24 @@ export default function LoginPage() {
         <form onSubmit={handleLogin}>
           <div className="form-group">
             <label>Email</label>
-            <input 
+            <input
               type="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               required
             />
           </div>
+
           <div className="form-group">
             <label>Password</label>
-            <input 
+            <input
               type="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               required
             />
           </div>
+
           <button className="login-btn" type="submit" disabled={loading}>
             {loading ? 'Logging in...' : 'Login'}
           </button>
