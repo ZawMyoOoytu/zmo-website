@@ -10,24 +10,30 @@
     "test": "echo 'No tests specified'",
     "render-build": "echo 'Building for Render deployment'"
   },
-  "keywords": ["express", "mongodb", "api", "admin", "dashboard"],
+  "keywords": [
+    "express",
+    "mongodb",
+    "api",
+    "admin",
+    "dashboard"
+  ],
   "author": "ZMO Team",
   "license": "MIT",
   "dependencies": {
-    "express": "^4.18.2",
-    "mongoose": "^7.5.0",
-    "cors": "^2.8.5",
-    "helmet": "^7.0.0",
-    "compression": "^1.7.4",
-    "express-rate-limit": "^6.10.0",
-    "dotenv": "^16.3.1",
     "bcryptjs": "^2.4.3",
-    "jsonwebtoken": "^9.0.2",
+    "compression": "^1.8.1",
+    "cors": "^2.8.5",
+    "dotenv": "^16.6.1",
+    "express": "^4.21.2",
     "express-mongo-sanitize": "^2.2.0",
-    "express-validator": "^7.0.1"
+    "express-rate-limit": "^6.11.2",
+    "express-validator": "^7.0.1",
+    "helmet": "^7.2.0",
+    "jsonwebtoken": "^9.0.2",
+    "mongoose": "^7.8.7"
   },
   "devDependencies": {
-    "nodemon": "^3.0.1"
+    "nodemon": "^3.1.10"
   },
   "engines": {
     "node": ">=18.0.0"

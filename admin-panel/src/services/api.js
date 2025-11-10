@@ -1,18 +1,19 @@
 import axios from 'axios';
 
 // ==========================================
-// 🚀 DIRECT CONFIGURATION (No env dependencies)
+// 🚀 ENHANCED CONFIGURATION
 // ==========================================
-const API_BASE_URL = 'https://zmo-backend.onrender.com/api';
+const API_BASE_URL = process.env.REACT_APP_API_URL || 'https://zmo-backend.onrender.com/api';
 const API_TIMEOUT = 30000;
 
 console.log('🚀 ZMO Admin Panel API Config:', { 
   API_BASE_URL, 
-  API_TIMEOUT 
+  API_TIMEOUT,
+  NODE_ENV: process.env.NODE_ENV 
 });
 
 // ==========================================
-// 🛠️ AXIOS INSTANCE
+// 🛠️ ENHANCED AXIOS INSTANCE
 // ==========================================
 const api = axios.create({
   baseURL: API_BASE_URL,
@@ -20,12 +21,14 @@ const api = axios.create({
   headers: {
     'Content-Type': 'application/json',
     'X-Client': 'zmo-admin-panel',
+    'X-Client-Version': '2.0.0',
+    'X-Platform': 'web'
   },
   withCredentials: false,
 });
 
 // ==========================================
-// 🔐 AUTH UTILITIES
+// 🔐 ENHANCED AUTH UTILITIES
 // ==========================================
 export const getToken = () => {
   return localStorage.getItem('adminToken') || sessionStorage.getItem('adminToken');
@@ -36,29 +39,39 @@ export const clearAuthData = () => {
   localStorage.removeItem('adminUser');
   sessionStorage.removeItem('adminToken');
   sessionStorage.removeItem('adminUser');
+  console.log('🔐 Auth data cleared');
 };
 
 // ==========================================
-// 🔗 TEST BACKEND CONNECTION
+// 🔗 ENHANCED BACKEND CONNECTION TEST
 // ==========================================
 export const testBackendConnection = async () => {
   try {
     console.log('🔗 Testing backend connection...');
     const response = await api.get('/health');
-    console.log('✅ Backend connection successful');
-    return { success: true, data: response.data };
+    console.log('✅ Backend connection successful:', response.data);
+    return { 
+      success: true, 
+      data: response.data,
+      message: 'Backend is healthy and responsive'
+    };
   } catch (error) {
     console.error('❌ Backend connection failed:', error.message);
     return { 
       success: false, 
       error: error.message,
-      message: 'Cannot connect to backend server' 
+      message: 'Cannot connect to backend server. Please check if the server is running.',
+      details: {
+        url: API_BASE_URL,
+        status: error.response?.status,
+        code: error.code
+      }
     };
   }
 };
 
 // ==========================================
-// 🔄 REQUEST INTERCEPTOR
+// 🔄 ENHANCED REQUEST INTERCEPTOR
 // ==========================================
 api.interceptors.request.use(
   (config) => {
@@ -67,7 +80,15 @@ api.interceptors.request.use(
       config.headers.Authorization = `Bearer ${token}`;
     }
     
-    console.log(`🚀 API Request: ${config.method?.toUpperCase()} ${config.url}`);
+    // Add request tracking
+    config.headers['X-Request-ID'] = Date.now().toString(36);
+    config.headers['X-Client-Timestamp'] = new Date().toISOString();
+    
+    console.log(`🚀 API Request: ${config.method?.toUpperCase()} ${config.url}`, {
+      hasToken: !!token,
+      timestamp: config.headers['X-Client-Timestamp']
+    });
+    
     return config;
   },
   (error) => {
@@ -77,28 +98,44 @@ api.interceptors.request.use(
 );
 
 // ==========================================
-// 📡 RESPONSE INTERCEPTOR
+// 📡 ENHANCED RESPONSE INTERCEPTOR
 // ==========================================
 api.interceptors.response.use(
   (response) => {
-    console.log(`✅ API Response: ${response.status} ${response.config.url}`);
+    console.log(`✅ API Response: ${response.status} ${response.config.url}`, {
+      success: response.data?.success,
+      message: response.data?.message
+    });
     return response;
   },
   (error) => {
-    console.error('❌ API Error:', {
+    const requestInfo = {
       url: error.config?.url,
+      method: error.config?.method,
       status: error.response?.status,
       message: error.message,
-      data: error.response?.data
-    });
+      code: error.code
+    };
 
+    console.error('❌ API Error:', requestInfo);
+
+    // Enhanced error handling
     if (error.response?.status === 401) {
+      console.log('🔐 Unauthorized - clearing auth data');
       clearAuthData();
       if (!window.location.pathname.includes('/login')) {
         setTimeout(() => {
           window.location.href = '/login?session=expired';
         }, 1000);
       }
+    } else if (error.response?.status === 403) {
+      console.error('🚫 Access forbidden - insufficient permissions');
+    } else if (error.response?.status === 404) {
+      console.error('🔍 Endpoint not found');
+    } else if (error.code === 'NETWORK_ERROR' || error.message === 'Network Error') {
+      console.error('🌐 Network error - check internet connection');
+    } else if (error.code === 'ECONNABORTED') {
+      console.error('⏰ Request timeout - server taking too long to respond');
     }
     
     return Promise.reject(error);
@@ -106,17 +143,17 @@ api.interceptors.response.use(
 );
 
 // ==========================================
-// 🔐 AUTH API - IMPROVED LOGIN
+// 🔐 ENHANCED AUTH API
 // ==========================================
 export const authAPI = {
   login: async (email, password, rememberMe = false) => {
     try {
       console.log('🔐 Attempting login with:', email);
       
-      // Test backend first
+      // Test backend connection first
       const connectionTest = await testBackendConnection();
       if (!connectionTest.success) {
-        throw new Error('Cannot connect to backend server');
+        throw new Error('Cannot connect to backend server. Please check if the server is running.');
       }
 
       const response = await api.post('/auth/login', {
@@ -126,17 +163,14 @@ export const authAPI = {
 
       console.log('📡 Login response received:', response.data);
 
-      // Check if we got a proper login response
+      // Validate response structure
       if (response.data && response.data.success && response.data.token) {
         const { token, user, message } = response.data;
         
         // Store authentication data
-        if (rememberMe) {
-          localStorage.setItem('adminToken', token);
-        } else {
-          sessionStorage.setItem('adminToken', token);
-        }
-        localStorage.setItem('adminUser', JSON.stringify(user));
+        const storage = rememberMe ? localStorage : sessionStorage;
+        storage.setItem('adminToken', token);
+        localStorage.setItem('adminUser', JSON.stringify(user)); // Always store user in localStorage
         
         console.log('✅ Login successful for:', user.email);
         return { 
@@ -146,9 +180,8 @@ export const authAPI = {
           message: message || 'Login successful' 
         };
       } else {
-        // Handle unexpected response format
-        console.error('❌ Unexpected login response:', response.data);
-        throw new Error(response.data.message || 'Invalid response from server');
+        console.error('❌ Unexpected login response format:', response.data);
+        throw new Error(response.data?.message || 'Invalid response from server');
       }
 
     } catch (error) {
@@ -161,13 +194,17 @@ export const authAPI = {
       let errorMessage = 'Login failed. Please try again.';
       
       if (error.message === 'Network Error' || error.message.includes('Failed to fetch')) {
-        errorMessage = 'Cannot connect to the server. Please check your internet connection.';
+        errorMessage = 'Cannot connect to the server. Please check your internet connection and ensure the backend is running.';
       } else if (error.response?.status === 401) {
         errorMessage = 'Invalid email or password.';
       } else if (error.response?.status === 404) {
         errorMessage = 'Login endpoint not found. Please contact support.';
+      } else if (error.response?.status === 429) {
+        errorMessage = 'Too many login attempts. Please try again later.';
       } else if (error.response?.data?.message) {
         errorMessage = error.response.data.message;
+      } else if (error.message.includes('Cannot connect to backend server')) {
+        errorMessage = error.message;
       }
       
       throw new Error(errorMessage);
@@ -176,11 +213,16 @@ export const authAPI = {
   
   logout: async () => {
     try {
-      await api.post('/auth/logout');
+      // Only attempt logout if we have a token
+      const token = getToken();
+      if (token) {
+        await api.post('/auth/logout');
+      }
     } catch (error) {
-      console.log('Logout failed (normal if backend down):', error.message);
+      console.log('Logout API call failed (normal if backend down):', error.message);
     } finally {
       clearAuthData();
+      console.log('✅ User logged out successfully');
       return { 
         success: true, 
         message: 'Logout successful' 
@@ -190,13 +232,20 @@ export const authAPI = {
   
   verify: async () => {
     try {
+      const token = getToken();
+      if (!token) {
+        throw new Error('No authentication token found');
+      }
+
       const response = await api.get('/auth/verify');
       if (response.data.success) {
+        console.log('✅ Token verification successful');
         return response.data;
       } else {
         throw new Error('Token verification failed');
       }
     } catch (error) {
+      console.error('❌ Token verification error:', error.message);
       clearAuthData();
       throw new Error('Session expired. Please login again.');
     }
@@ -217,10 +266,18 @@ export const authAPI = {
     const user = authAPI.getCurrentUser();
     return !!(token && user);
   },
+
+  // Get demo login credentials
+  getDemoCredentials: () => {
+    return {
+      email: 'admin@zmo.com',
+      password: 'password'
+    };
+  }
 };
 
 // ==========================================
-// 📊 DASHBOARD API
+// 📊 ENHANCED DASHBOARD API
 // ==========================================
 export const dashboardAPI = {
   getStats: async () => {
@@ -234,7 +291,7 @@ export const dashboardAPI = {
     } catch (error) {
       console.error('❌ Dashboard stats error:', error);
       
-      // Demo data for when backend is down
+      // Enhanced demo data
       const demoStats = {
         totalBlogs: 24,
         totalProjects: 15,
@@ -243,39 +300,60 @@ export const dashboardAPI = {
         monthlyVisitors: 2845,
         revenue: 45200,
         performance: 92.5,
+        server: {
+          status: 'healthy',
+          responseTime: '125ms',
+          uptime: Math.floor(Math.random() * 1000000)
+        },
         recentActivities: [
           { 
             id: 1, 
             action: 'New blog published', 
             user: 'Admin User', 
             time: '2 hours ago',
-            type: 'blog'
+            type: 'blog',
+            icon: '📝'
           },
           { 
             id: 2, 
             action: 'Project completed', 
             user: 'Content Team', 
             time: '5 hours ago',
-            type: 'project'
+            type: 'project',
+            icon: '🚀'
+          },
+          { 
+            id: 3, 
+            action: 'User registered', 
+            user: 'System', 
+            time: '1 day ago',
+            type: 'user',
+            icon: '👤'
           }
-        ]
+        ],
+        chartData: {
+          labels: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul'],
+          visitors: [65, 59, 80, 81, 56, 55, 70],
+          revenue: [28, 48, 40, 19, 86, 27, 45],
+          projects: [5, 8, 12, 6, 15, 10, 8]
+        }
       };
       
       return {
         success: true,
         data: demoStats,
         demoMode: true,
-        message: 'Using demo dashboard data'
+        message: 'Using demo dashboard data - Backend connection issue'
       };
     }
   },
 };
 
 // ==========================================
-// 📝 BLOG API - COMPLETE CRUD OPERATIONS
+// 📝 ENHANCED BLOG API WITH PUBLIC ENDPOINTS
 // ==========================================
 export const blogAPI = {
-  // Get all blogs
+  // Get all blogs (Admin protected)
   getAll: async (params = {}) => {
     try {
       const response = await api.get('/admin/blogs', { params });
@@ -292,46 +370,52 @@ export const blogAPI = {
     } catch (error) {
       console.error('❌ Blog API error:', error);
       
-      // Demo data for when backend is down
+      // Enhanced demo data
       const demoBlogs = [
         {
           id: 1,
-          title: 'Getting Started with React',
-          excerpt: 'Learn the basics of React development and build your first application.',
+          title: 'Getting Started with React on Render',
+          excerpt: 'Learn how to deploy React applications on Render platform with best practices.',
           status: 'published',
           author: 'Admin User',
-          tags: ['react', 'javascript', 'frontend'],
+          tags: ['react', 'javascript', 'frontend', 'deployment'],
           featured: true,
           createdAt: '2024-01-15T10:30:00Z',
+          updatedAt: '2024-01-15T10:30:00Z',
           views: 1245,
           likes: 89,
-          readTime: 5
+          readTime: 5,
+          image: 'https://images.unsplash.com/photo-1633356122544-f134324a6cee?w=500'
         },
         {
           id: 2,
           title: 'Building REST APIs with Node.js',
-          excerpt: 'Create powerful and scalable backend APIs using Node.js and Express.',
+          excerpt: 'Create powerful and scalable backend APIs using Node.js and Express framework.',
           status: 'published',
           author: 'Admin User',
-          tags: ['nodejs', 'api', 'backend'],
+          tags: ['nodejs', 'api', 'backend', 'express'],
           featured: false,
           createdAt: '2024-01-10T14:20:00Z',
+          updatedAt: '2024-01-12T16:45:00Z',
           views: 892,
           likes: 45,
-          readTime: 8
+          readTime: 8,
+          image: 'https://images.unsplash.com/photo-1627398242454-45a1465c2479?w=500'
         },
         {
           id: 3,
-          title: 'Modern CSS Techniques',
-          excerpt: 'Explore modern CSS features like Grid, Flexbox, and CSS Variables.',
+          title: 'Modern CSS Techniques for 2024',
+          excerpt: 'Explore modern CSS features like Grid, Flexbox, and CSS Variables for better designs.',
           status: 'draft',
           author: 'Admin User',
-          tags: ['css', 'frontend', 'design'],
+          tags: ['css', 'frontend', 'design', 'styling'],
           featured: false,
           createdAt: '2024-01-08T09:15:00Z',
+          updatedAt: '2024-01-09T11:20:00Z',
           views: 567,
           likes: 23,
-          readTime: 6
+          readTime: 6,
+          image: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=500'
         }
       ];
       
@@ -340,12 +424,85 @@ export const blogAPI = {
         blogs: demoBlogs, 
         total: demoBlogs.length,
         demoMode: true,
-        message: 'Using demo blog data'
+        message: 'Using demo blog data - Backend connection issue'
       };
     }
   },
 
-  // Create new blog - THE MISSING FUNCTION
+  // Get public blogs (No authentication required)
+  getPublicBlogs: async (params = {}) => {
+    try {
+      const response = await api.get('/blogs', { params });
+      return {
+        success: true,
+        data: response.data.data || [],
+        pagination: response.data.pagination,
+        total: response.data.pagination?.total || 0
+      };
+    } catch (error) {
+      console.error('❌ Public blogs API error:', error);
+      
+      // Fallback to public demo data
+      const publicBlogs = [
+        {
+          id: 1,
+          title: 'Getting Started with React on Render',
+          excerpt: 'Learn how to deploy React applications on Render platform.',
+          author: 'Admin User',
+          publishedAt: '2024-01-15T10:30:00Z',
+          readTime: 5,
+          tags: ['react', 'deployment', 'tutorial'],
+          image: 'https://images.unsplash.com/photo-1633356122544-f134324a6cee?w=500'
+        },
+        {
+          id: 2,
+          title: 'Building Scalable Backends with Node.js',
+          excerpt: 'Best practices for building scalable backend services.',
+          author: 'Content Team',
+          publishedAt: '2024-01-10T14:20:00Z',
+          readTime: 8,
+          tags: ['nodejs', 'backend', 'scalability'],
+          image: 'https://images.unsplash.com/photo-1627398242454-45a1465c2479?w=500'
+        }
+      ];
+      
+      return {
+        success: true,
+        data: publicBlogs,
+        demoMode: true,
+        message: 'Using demo public blog data'
+      };
+    }
+  },
+
+  // Get simple blogs (No authentication required)
+  getSimpleBlogs: async () => {
+    try {
+      const response = await api.get('/simple');
+      return response.data;
+    } catch (error) {
+      console.error('❌ Simple blogs API error:', error);
+      
+      return {
+        success: true,
+        data: [
+          {
+            id: 1,
+            title: 'Getting Started with React on Render',
+            excerpt: 'Learn how to deploy React applications on Render platform.',
+            author: 'Admin User',
+            publishedAt: '2024-01-15T10:30:00Z',
+            readTime: 5,
+            tags: ['react', 'deployment', 'tutorial']
+          }
+        ],
+        demoMode: true,
+        message: 'Using demo simple blog data'
+      };
+    }
+  },
+
+  // Create new blog
   create: async (blogData) => {
     try {
       console.log('📝 Creating new blog:', blogData);
@@ -361,17 +518,18 @@ export const blogAPI = {
     } catch (error) {
       console.error('❌ Create blog error:', error);
       
-      // Demo mode fallback
+      // Enhanced demo mode fallback
       const demoBlog = {
         id: Date.now(),
         ...blogData,
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
-        status: blogData.status || 'published',
-        author: 'Demo User',
+        status: blogData.status || 'draft',
+        author: authAPI.getCurrentUser()?.name || 'Demo User',
         views: 0,
         likes: 0,
-        readTime: Math.ceil((blogData.content?.length || 0) / 200) || 3
+        readTime: Math.ceil((blogData.content?.length || 0) / 200) || 3,
+        image: blogData.image || 'https://images.unsplash.com/photo-1486312338219-ce68d2c6f44d?w=500'
       };
       
       return {
@@ -391,40 +549,51 @@ export const blogAPI = {
     } catch (error) {
       console.error('❌ Get blog error:', error);
       
-      // Demo data
+      // Enhanced demo data
       const demoBlog = {
         id: id,
-        title: 'Demo Blog Post',
+        title: 'Demo Blog Post - Backend Connection Issue',
         content: `
           <h1>Demo Blog Post</h1>
           <p>This is a demo blog post content. The backend is currently unavailable, but you can still preview how the blog would look and function.</p>
-          <p>In a real scenario, this would contain the actual blog content with proper formatting, images, and other media.</p>
-          <h2>Features of this blog:</h2>
+          
+          <h2>Backend Status</h2>
+          <p>The admin panel is currently running in demo mode because the backend server is not accessible. This allows you to:</p>
           <ul>
-            <li>Rich text content</li>
-            <li>Image support</li>
-            <li>SEO optimization</li>
-            <li>Social sharing</li>
+            <li>Preview the user interface</li>
+            <li>Test frontend functionality</li>
+            <li>See how the blog management system works</li>
           </ul>
-          <p>When the backend is available, all CRUD operations will work seamlessly with real data.</p>
+          
+          <h2>When Backend is Available</h2>
+          <p>All CRUD operations will work seamlessly with real data:</p>
+          <ul>
+            <li>Create, read, update, and delete blog posts</li>
+            <li>Real-time data synchronization</li>
+            <li>User authentication and authorization</li>
+            <li>File uploads and media management</li>
+          </ul>
+          
+          <p><strong>Current Backend URL:</strong> ${API_BASE_URL}</p>
         `,
-        excerpt: 'Demo blog post excerpt for testing purposes. This shows how the blog would appear in lists and previews.',
+        excerpt: 'Demo blog post showing how the system works when backend is unavailable.',
         status: 'published',
         author: 'Demo Author',
-        tags: ['demo', 'blog', 'test', 'example'],
-        featured: false,
+        tags: ['demo', 'blog', 'backend', 'connection'],
+        featured: true,
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
         views: 42,
         likes: 5,
-        readTime: 4
+        readTime: 4,
+        image: 'https://images.unsplash.com/photo-1555066931-4365d14bab8c?w=800'
       };
       
       return {
         success: true,
         data: demoBlog,
         demoMode: true,
-        message: 'Using demo blog data'
+        message: 'Using demo blog data - Backend connection issue'
       };
     }
   },
@@ -445,7 +614,6 @@ export const blogAPI = {
     } catch (error) {
       console.error('❌ Update blog error:', error);
       
-      // Demo mode fallback
       return {
         success: true,
         message: 'Blog updated successfully (demo mode)',
@@ -475,7 +643,6 @@ export const blogAPI = {
     } catch (error) {
       console.error('❌ Delete blog error:', error);
       
-      // Demo mode fallback
       return {
         success: true,
         message: 'Blog deleted successfully (demo mode)',
@@ -484,161 +651,23 @@ export const blogAPI = {
     }
   },
 
-  // Publish blog
-  publish: async (id) => {
+  // Get blog tags
+  getTags: async () => {
     try {
-      const response = await api.patch(`/admin/blogs/${id}/publish`);
+      const response = await api.get('/blogs/tags');
       return response.data;
     } catch (error) {
-      console.error('❌ Publish blog error:', error);
+      console.error('❌ Get tags error:', error);
       
       return {
         success: true,
-        message: 'Blog published successfully (demo mode)',
-        demoMode: true
-      };
-    }
-  },
-
-  // Unpublish blog
-  unpublish: async (id) => {
-    try {
-      const response = await api.patch(`/admin/blogs/${id}/unpublish`);
-      return response.data;
-    } catch (error) {
-      console.error('❌ Unpublish blog error:', error);
-      
-      return {
-        success: true,
-        message: 'Blog unpublished successfully (demo mode)',
-        demoMode: true
-      };
-    }
-  },
-
-  // Upload blog image
-  uploadImage: async (imageFile) => {
-    try {
-      const formData = new FormData();
-      formData.append('image', imageFile);
-      
-      const response = await api.post('/admin/blogs/upload', formData, {
-        headers: {
-          'Content-Type': 'multipart/form-data',
-        },
-      });
-      
-      return response.data;
-    } catch (error) {
-      console.error('❌ Image upload error:', error);
-      
-      // Return demo image URL
-      return {
-        success: true,
-        data: {
-          url: 'https://via.placeholder.com/800x400/667eea/ffffff?text=Blog+Image',
-          filename: 'demo-image.jpg'
-        },
-        demoMode: true,
-        message: 'Image uploaded (demo mode)'
-      };
-    }
-  }
-};
-
-// ==========================================
-// 📧 CONTACT API
-// ==========================================
-export const contactAPI = {
-  getAll: async (params = {}) => {
-    try {
-      const response = await api.get('/admin/contacts', { params });
-      return response.data;
-    } catch (error) {
-      console.error('❌ Contact API error:', error);
-      
-      // Demo data
-      const demoContacts = [
-        {
-          id: 1,
-          name: 'John Doe',
-          email: 'john@example.com',
-          subject: 'Partnership Inquiry',
-          message: 'I would like to discuss potential partnership opportunities.',
-          status: 'new',
-          createdAt: '2024-01-15T14:30:00Z'
-        },
-        {
-          id: 2,
-          name: 'Jane Smith',
-          email: 'jane@example.com',
-          subject: 'Support Request',
-          message: 'I need help with my account setup.',
-          status: 'read',
-          createdAt: '2024-01-14T10:15:00Z'
-        }
-      ];
-      
-      return {
-        success: true,
-        data: { contacts: demoContacts, total: demoContacts.length },
-        demoMode: true,
-        message: 'Using demo contact data'
-      };
-    }
-  },
-
-  getById: async (id) => {
-    try {
-      const response = await api.get(`/admin/contacts/${id}`);
-      return response.data;
-    } catch (error) {
-      console.error('❌ Get contact error:', error);
-      
-      // Demo data
-      const demoContact = {
-        id: id,
-        name: 'Demo Contact',
-        email: 'demo@example.com',
-        subject: 'Demo Inquiry',
-        message: 'This is a demo contact message for testing purposes.',
-        status: 'new',
-        createdAt: new Date().toISOString()
-      };
-      
-      return {
-        success: true,
-        data: demoContact,
-        demoMode: true
-      };
-    }
-  },
-
-  markAsRead: async (id) => {
-    try {
-      const response = await api.patch(`/admin/contacts/${id}/read`);
-      return response.data;
-    } catch (error) {
-      console.error('❌ Mark as read error:', error);
-      
-      return {
-        success: true,
-        message: 'Contact marked as read (demo mode)',
-        demoMode: true
-      };
-    }
-  },
-
-  delete: async (id) => {
-    try {
-      const response = await api.delete(`/admin/contacts/${id}`);
-      return response.data;
-    } catch (error) {
-      console.error('❌ Delete contact error:', error);
-      
-      return {
-        success: true,
-        message: 'Contact deleted successfully (demo mode)',
+        data: [
+          { name: 'react', count: 3 },
+          { name: 'nodejs', count: 2 },
+          { name: 'mongodb', count: 2 },
+          { name: 'deployment', count: 1 },
+          { name: 'backend', count: 2 }
+        ],
         demoMode: true
       };
     }
@@ -646,79 +675,13 @@ export const contactAPI = {
 };
 
 // ==========================================
-// 👥 USER MANAGEMENT API
-// ==========================================
-export const userAPI = {
-  getAll: async (params = {}) => {
-    try {
-      const response = await api.get('/admin/users', { params });
-      return response.data;
-    } catch (error) {
-      console.error('❌ User API error:', error);
-      
-      // Demo data
-      const demoUsers = [
-        {
-          id: 1,
-          name: 'Admin User',
-          email: 'admin@zmo.com',
-          role: 'admin',
-          status: 'active',
-          lastLogin: '2024-01-15T10:30:00Z',
-          createdAt: '2024-01-01T00:00:00Z'
-        },
-        {
-          id: 2,
-          name: 'Content Manager',
-          email: 'content@zmo.com',
-          role: 'content_manager',
-          status: 'active',
-          lastLogin: '2024-01-14T15:45:00Z',
-          createdAt: '2024-01-02T00:00:00Z'
-        }
-      ];
-      
-      return {
-        success: true,
-        data: { users: demoUsers, total: demoUsers.length },
-        demoMode: true,
-        message: 'Using demo user data'
-      };
-    }
-  }
-};
-
-// ==========================================
-// ❤️ HEALTH API
-// ==========================================
-export const healthAPI = {
-  check: async () => {
-    try {
-      const response = await api.get('/health');
-      return { 
-        success: true, 
-        data: response.data, 
-        message: 'Backend is healthy' 
-      };
-    } catch (error) {
-      console.error('❌ Health check failed:', error.message);
-      return { 
-        success: false, 
-        error: error.message, 
-        message: 'Backend health check failed' 
-      };
-    }
-  }
-};
-
-// ==========================================
-// 🎯 DIRECT LOGIN TEST FUNCTION
+// 🎯 ENHANCED TEST FUNCTIONS
 // ==========================================
 export const testLoginEndpoint = async () => {
   try {
     console.log('🧪 Testing login endpoint directly...');
     
-    const response = await fetch('https://zmo-backend.onrender.com/api/auth/login', {
+    const response = await fetch(`${API_BASE_URL}/auth/login`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -729,33 +692,85 @@ export const testLoginEndpoint = async () => {
       }),
     });
 
-    console.log('📊 Login test response:', {
-      status: response.status,
-      statusText: response.statusText,
-      ok: response.ok,
-      url: response.url
-    });
-
     const data = await response.json();
-    console.log('📦 Login test data:', data);
     
-    return { success: response.ok, data, status: response.status };
+    console.log('📊 Login test result:', {
+      status: response.status,
+      ok: response.ok,
+      success: data.success,
+      message: data.message
+    });
+    
+    return { 
+      success: response.ok && data.success, 
+      data, 
+      status: response.status 
+    };
     
   } catch (error) {
     console.error('❌ Login test failed:', error);
-    return { success: false, error: error.message };
+    return { 
+      success: false, 
+      error: error.message 
+    };
   }
 };
 
-// Auto-test connection
+// ==========================================
+// 🏥 HEALTH CHECK API
+// ==========================================
+export const healthAPI = {
+  check: async () => {
+    try {
+      const response = await api.get('/health');
+      return { 
+        success: true, 
+        data: response.data, 
+        message: 'Backend is healthy and responsive',
+        timestamp: new Date().toISOString()
+      };
+    } catch (error) {
+      console.error('❌ Health check failed:', error.message);
+      return { 
+        success: false, 
+        error: error.message, 
+        message: 'Backend health check failed',
+        timestamp: new Date().toISOString()
+      };
+    }
+  },
+
+  getStatus: async () => {
+    try {
+      const response = await api.get('/status');
+      return response.data;
+    } catch (error) {
+      console.error('❌ Status check failed:', error.message);
+      return {
+        success: false,
+        service: 'ZMO Backend API',
+        status: 'unreachable',
+        error: error.message,
+        timestamp: new Date().toISOString()
+      };
+    }
+  }
+};
+
+// ==========================================
+// 🔄 AUTO-CONNECTION TEST ON LOAD
+// ==========================================
+// Test connection when module loads
 setTimeout(() => {
+  console.log('🔗 Auto-testing backend connection...');
   testBackendConnection().then(result => {
     if (result.success) {
-      console.log('🎉 Backend is ready!');
+      console.log('🎉 Backend connection successful! Ready for operations.');
     } else {
-      console.warn('⚠️ Backend connection issue detected');
+      console.warn('⚠️ Backend connection issue:', result.message);
+      console.log('💡 The app will run in demo mode with sample data.');
     }
   });
-}, 1000);
+}, 2000);
 
 export default api;
