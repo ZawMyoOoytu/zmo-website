@@ -4,25 +4,22 @@
   "buildCommand": "npm run build",
   "outputDirectory": "build",
   "installCommand": "npm install",
-  "functions": {
-    "src/api/**/*.js": {
-      "maxDuration": 10
-    }
-  },
   "env": {
     "REACT_APP_API_URL": "https://zmo-backend.onrender.com",
     "REACT_APP_API_BASE_URL": "https://zmo-backend.onrender.com/api",
     "REACT_APP_ADMIN_URL": "https://zmo-admin.vercel.app",
-    "REACT_APP_FRONTEND_URL": "https://zmo-frontend.vercel.app",
-    "REACT_APP_ENV": "production",
-    "REACT_APP_VERSION": "2.0.0",
-    "REACT_APP_DEPLOYMENT_PLATFORM": "vercel",
-    "REACT_APP_BACKEND_PLATFORM": "render"
+    "REACT_APP_FRONTEND_URL": "https://zmo-frontend.vercel.app"
   },
-  "rewrites": [
+  "routes": [
     {
-      "source": "/(.*)",
-      "destination": "/index.html"
+      "src": "/static/(.*)",
+      "headers": {
+        "cache-control": "s-maxage=31536000,immutable"
+      }
+    },
+    {
+      "src": "/(.*)",
+      "dest": "/index.html"
     }
   ]
 }

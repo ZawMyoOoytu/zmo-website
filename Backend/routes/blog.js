@@ -1,21 +1,54 @@
-// backend/routes/blog.js - UPDATED TO MATCH FRONTEND ROUTES
+// backend/routes/blogs.js - FIXED MIDDLEWARE AND ROUTE STRUCTURE
 const express = require('express');
 const router = express.Router();
 const Blog = require('../models/Blog');
+const { adminAuth } = require('../middleware/auth');
 
 console.log('📝 Initializing blog routes...');
 
-// ✅ GET /admin/blogs - Get all blogs for admin (UPDATED PATH)
-router.get('/admin/blogs', async (req, res) => {
+// 🌐 PUBLIC ROUTES (no authentication required)
+
+// ✅ GET /api/blogs - Get published blogs for public
+router.get('/', async (req, res) => {
   try {
-    console.log('📡 GET /admin/blogs - Fetching all blogs...');
-    const blogs = await Blog.find({}).sort({ createdAt: -1 });
-    console.log(`✅ Found ${blogs.length} blogs`);
+    console.log('📡 GET /api/blogs - Fetching published blogs...');
     
-    // Return array directly to match frontend expectation
-    res.json(blogs);
+    const { page = 1, limit = 10, search = '' } = req.query;
+    
+    // Build search query for published blogs only
+    const searchQuery = { 
+      published: true,
+      ...(search && {
+        $or: [
+          { title: { $regex: search, $options: 'i' } },
+          { content: { $regex: search, $options: 'i' } },
+          { tags: { $regex: search, $options: 'i' } }
+        ]
+      })
+    };
+
+    const blogs = await Blog.find(searchQuery)
+      .sort({ createdAt: -1 })
+      .limit(limit * 1)
+      .skip((page - 1) * limit)
+      .select('-__v'); // Exclude version key
+
+    const total = await Blog.countDocuments(searchQuery);
+
+    console.log(`✅ Found ${blogs.length} published blogs out of ${total} total`);
+    
+    res.json({
+      success: true,
+      data: blogs,
+      total: total,
+      pagination: {
+        current: parseInt(page),
+        pages: Math.ceil(total / limit),
+        total
+      }
+    });
   } catch (error) {
-    console.error('❌ Error fetching blogs:', error);
+    console.error('❌ Error fetching published blogs:', error);
     res.status(500).json({
       success: false,
       message: 'Error fetching blogs',
@@ -24,10 +57,129 @@ router.get('/admin/blogs', async (req, res) => {
   }
 });
 
-// ✅ POST /admin/blogs - Create new blog (UPDATED PATH)
-router.post('/admin/blogs', async (req, res) => {
+// ✅ GET /api/blogs/simple - Simple endpoint for frontend
+router.get('/simple', async (req, res) => {
   try {
-    console.log('📝 POST /admin/blogs - Creating new blog...', req.body);
+    console.log('📡 GET /api/blogs/simple - Fetching simple blogs data...');
+    
+    const blogs = await Blog.find({ published: true })
+      .sort({ createdAt: -1 })
+      .limit(6)
+      .select('title excerpt imageUrl createdAt tags');
+    
+    console.log(`✅ Found ${blogs.length} blogs for simple endpoint`);
+    
+    res.json({
+      success: true,
+      data: blogs,
+      message: 'Blogs fetched successfully'
+    });
+  } catch (error) {
+    console.error('❌ Error in simple endpoint:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to fetch blogs',
+      error: error.message
+    });
+  }
+});
+
+// ✅ GET /api/blogs/:id - Get single blog post for public
+router.get('/:id', async (req, res) => {
+  try {
+    console.log('📡 GET /api/blogs/', req.params.id);
+    
+    if (!req.params.id.match(/^[0-9a-fA-F]{24}$/)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid blog ID format'
+      });
+    }
+
+    const blog = await Blog.findById(req.params.id);
+    if (blog && blog.published) {
+      // Increment view count
+      await Blog.findByIdAndUpdate(req.params.id, { 
+        $inc: { views: 1 } 
+      });
+      
+      res.json({
+        success: true,
+        data: blog
+      });
+    } else {
+      res.status(404).json({
+        success: false,
+        message: 'Blog not found or not published'
+      });
+    }
+  } catch (error) {
+    console.error('❌ Error fetching blog post:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error fetching blog post',
+      error: error.message
+    });
+  }
+});
+
+// 🔐 ADMIN ROUTES (protected by adminAuth middleware)
+
+// ✅ GET /api/blogs/admin/all - Get all blogs for admin (with pagination)
+router.get('/admin/all', adminAuth, async (req, res) => {
+  try {
+    console.log('📡 GET /api/blogs/admin/all - Fetching all blogs for admin...');
+    console.log('👤 Request by admin:', req.user.email);
+    
+    const { page = 1, limit = 10, search = '', status = '' } = req.query;
+    
+    // Build search query for admin (all blogs)
+    const searchQuery = search ? {
+      $or: [
+        { title: { $regex: search, $options: 'i' } },
+        { content: { $regex: search, $options: 'i' } },
+        { tags: { $regex: search, $options: 'i' } }
+      ]
+    } : {};
+
+    // Add status filter if provided
+    if (status === 'published') searchQuery.published = true;
+    if (status === 'draft') searchQuery.published = false;
+
+    const blogs = await Blog.find(searchQuery)
+      .sort({ createdAt: -1 })
+      .limit(limit * 1)
+      .skip((page - 1) * limit);
+
+    const total = await Blog.countDocuments(searchQuery);
+
+    console.log(`✅ Found ${blogs.length} blogs out of ${total} total for admin`);
+    
+    res.json({
+      success: true,
+      data: blogs,
+      total: total,
+      pagination: {
+        current: parseInt(page),
+        pages: Math.ceil(total / limit),
+        total
+      }
+    });
+  } catch (error) {
+    console.error('❌ Error fetching admin blogs:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error fetching blogs',
+      error: error.message
+    });
+  }
+});
+
+// ✅ POST /api/blogs/admin/create - Create new blog
+router.post('/admin/create', adminAuth, async (req, res) => {
+  try {
+    console.log('📝 POST /api/blogs/admin/create - Creating new blog...');
+    console.log('👤 Request by admin:', req.user.email);
     
     if (!req.body.title || !req.body.content) {
       return res.status(400).json({
@@ -45,12 +197,12 @@ router.post('/admin/blogs', async (req, res) => {
       title: req.body.title,
       content: req.body.content,
       excerpt: excerpt,
-      image: req.body.image || '',
-      imageUrl: req.body.imageUrl || '',
+      imageUrl: req.body.imageUrl || req.body.image || '/uploads/default-blog.jpg',
       tags: req.body.tags || [],
       published: req.body.published !== false,
       author: req.body.author || 'Admin',
-      // Add createdAt and updatedAt for consistency
+      authorId: req.user.userId,
+      views: 0,
       createdAt: new Date(),
       updatedAt: new Date()
     });
@@ -59,8 +211,11 @@ router.post('/admin/blogs', async (req, res) => {
     
     console.log('✅ Blog created successfully:', savedBlog.title);
     
-    // Return the blog directly to match frontend expectation
-    res.status(201).json(savedBlog);
+    res.status(201).json({
+      success: true,
+      message: 'Blog created successfully',
+      data: savedBlog
+    });
 
   } catch (error) {
     console.error('❌ Error creating blog:', error);
@@ -81,10 +236,11 @@ router.post('/admin/blogs', async (req, res) => {
   }
 });
 
-// ✅ PUT /admin/blogs/:id - Update blog post (UPDATED PATH)
-router.put('/admin/blogs/:id', async (req, res) => {
+// ✅ PUT /api/blogs/admin/update/:id - Update blog post
+router.put('/admin/update/:id', adminAuth, async (req, res) => {
   try {
-    console.log('✏️ PUT /admin/blogs/', req.params.id, 'with data:', req.body);
+    console.log('✏️ PUT /api/blogs/admin/update/', req.params.id);
+    console.log('👤 Request by admin:', req.user.email);
     
     if (!req.params.id.match(/^[0-9a-fA-F]{24}$/)) {
       return res.status(400).json({
@@ -93,11 +249,17 @@ router.put('/admin/blogs/:id', async (req, res) => {
       });
     }
 
-    // Add updatedAt timestamp
     const updateData = {
       ...req.body,
       updatedAt: new Date()
     };
+
+    // Handle imageUrl/image field consistency
+    if (req.body.imageUrl) {
+      updateData.imageUrl = req.body.imageUrl;
+    } else if (req.body.image) {
+      updateData.imageUrl = req.body.image;
+    }
 
     const updatedBlog = await Blog.findByIdAndUpdate(
       req.params.id,
@@ -108,8 +270,11 @@ router.put('/admin/blogs/:id', async (req, res) => {
     if (updatedBlog) {
       console.log('✅ Blog updated successfully:', updatedBlog.title);
       
-      // Return the blog directly to match frontend expectation
-      res.json(updatedBlog);
+      res.json({
+        success: true,
+        message: 'Blog updated successfully',
+        data: updatedBlog
+      });
     } else {
       res.status(404).json({
         success: false,
@@ -135,10 +300,11 @@ router.put('/admin/blogs/:id', async (req, res) => {
   }
 });
 
-// ✅ DELETE /admin/blogs/:id - Delete blog post (UPDATED PATH)
-router.delete('/admin/blogs/:id', async (req, res) => {
+// ✅ DELETE /api/blogs/admin/delete/:id - Delete blog post
+router.delete('/admin/delete/:id', adminAuth, async (req, res) => {
   try {
-    console.log('🗑️ DELETE /admin/blogs/', req.params.id);
+    console.log('🗑️ DELETE /api/blogs/admin/delete/', req.params.id);
+    console.log('👤 Request by admin:', req.user.email);
     
     if (!req.params.id.match(/^[0-9a-fA-F]{24}$/)) {
       return res.status(400).json({
@@ -154,7 +320,7 @@ router.delete('/admin/blogs/:id', async (req, res) => {
       res.json({
         success: true,
         message: 'Blog deleted successfully',
-        deletedBlog: {
+        data: {
           id: deletedBlog._id,
           title: deletedBlog.title
         }
@@ -176,10 +342,11 @@ router.delete('/admin/blogs/:id', async (req, res) => {
   }
 });
 
-// ✅ GET /admin/blogs/:id - Get single blog for admin (NEW ROUTE)
-router.get('/admin/blogs/:id', async (req, res) => {
+// ✅ GET /api/blogs/admin/:id - Get single blog for admin
+router.get('/admin/:id', adminAuth, async (req, res) => {
   try {
-    console.log('📡 GET /admin/blogs/', req.params.id);
+    console.log('📡 GET /api/blogs/admin/', req.params.id);
+    console.log('👤 Request by admin:', req.user.email);
     
     if (!req.params.id.match(/^[0-9a-fA-F]{24}$/)) {
       return res.status(400).json({
@@ -190,7 +357,10 @@ router.get('/admin/blogs/:id', async (req, res) => {
 
     const blog = await Blog.findById(req.params.id);
     if (blog) {
-      res.json(blog);
+      res.json({
+        success: true,
+        data: blog
+      });
     } else {
       res.status(404).json({
         success: false,
@@ -207,63 +377,5 @@ router.get('/admin/blogs/:id', async (req, res) => {
   }
 });
 
-// ✅ PUBLIC ROUTES (keep these as they are)
-
-// GET /blog - Get published blogs for public
-router.get('/', async (req, res) => {
-  try {
-    console.log('📡 GET /blog - Fetching published blogs...');
-    const blogs = await Blog.find({ published: true }).sort({ createdAt: -1 });
-    console.log(`✅ Found ${blogs.length} published blogs`);
-    
-    res.json({
-      success: true,
-      data: blogs,
-      count: blogs.length
-    });
-  } catch (error) {
-    console.error('❌ Error fetching published blogs:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Error fetching blogs',
-      error: error.message
-    });
-  }
-});
-
-// GET /blog/:id - Get single blog post for public
-router.get('/:id', async (req, res) => {
-  try {
-    console.log('📡 GET /blog/', req.params.id);
-    
-    if (!req.params.id.match(/^[0-9a-fA-F]{24}$/)) {
-      return res.status(400).json({
-        success: false,
-        message: 'Invalid blog ID format'
-      });
-    }
-
-    const blog = await Blog.findById(req.params.id);
-    if (blog && blog.published) {
-      res.json({
-        success: true,
-        data: blog
-      });
-    } else {
-      res.status(404).json({
-        success: false,
-        message: 'Blog not found or not published'
-      });
-    }
-  } catch (error) {
-    console.error('❌ Error fetching blog post:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Error fetching blog post',
-      error: error.message
-    });
-  }
-});
-
-console.log('✅ Blog routes initialized with frontend-compatible paths');
+console.log('✅ Blog routes initialized with proper structure');
 module.exports = router;

@@ -1,6 +1,8 @@
+// backend/routes/projects.js - FIXED ROUTE STRUCTURE
 const express = require('express');
 const mongoose = require('mongoose');
 const router = express.Router();
+const { adminAuth } = require('../middleware/auth'); // ✅ Add authentication
 
 console.log('🔧 Initializing projects routes...');
 
@@ -13,12 +15,15 @@ try {
   Project = mongoose.model('Project');
 }
 
-// ✅ GET /projects/admin/all - Get all projects for admin
-router.get('/admin/all', async (req, res) => {
+// 🔐 APPLY ADMIN AUTH MIDDLEWARE TO ADMIN ROUTES
+router.use('/admin', adminAuth);
+
+// ✅ GET /api/projects - Get all projects for PUBLIC (FIXED PATH)
+router.get('/', async (req, res) => {
   try {
-    console.log('📡 GET /projects/admin/all - Fetching all projects...');
+    console.log('📡 GET /api/projects - Fetching all projects for public...');
     const projects = await Project.find({}).sort({ createdAt: -1 });
-    console.log(`✅ Found ${projects.length} projects`);
+    console.log(`✅ Found ${projects.length} projects for public`);
     
     res.json({
       success: true,
@@ -35,10 +40,37 @@ router.get('/admin/all', async (req, res) => {
   }
 });
 
-// ✅ POST /projects/admin/create - Create new project
-router.post('/admin/create', async (req, res) => {
+// ✅ ADMIN ROUTES (require authentication)
+
+// GET /api/projects/admin - Get all projects for admin (FIXED PATH)
+router.get('/admin', async (req, res) => {
   try {
-    console.log('📝 POST /projects/admin/create - Creating new project...');
+    console.log('📡 GET /api/projects/admin - Fetching all projects for admin...');
+    console.log('👤 Request by admin:', req.user.email);
+    
+    const projects = await Project.find({}).sort({ createdAt: -1 });
+    console.log(`✅ Found ${projects.length} projects for admin`);
+    
+    res.json({
+      success: true,
+      data: projects,
+      count: projects.length
+    });
+  } catch (error) {
+    console.error('❌ Error fetching projects for admin:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error fetching projects',
+      error: error.message
+    });
+  }
+});
+
+// POST /api/projects/admin - Create new project (FIXED PATH)
+router.post('/admin', async (req, res) => {
+  try {
+    console.log('📝 POST /api/projects/admin - Creating new project...');
+    console.log('👤 Request by admin:', req.user.email);
     console.log('📦 Request body:', req.body);
     
     if (!req.body.name || !req.body.description) {
@@ -54,7 +86,7 @@ router.post('/admin/create', async (req, res) => {
       technologies: req.body.technologies || [],
       githubUrl: req.body.githubUrl || '',
       liveUrl: req.body.liveUrl || '',
-      demoUrl: req.body.demoUrl || '', // ✅ Ensure demoUrl is included
+      demoUrl: req.body.demoUrl || '',
       featured: req.body.featured || false,
       image: req.body.image || ''
     });
@@ -62,11 +94,6 @@ router.post('/admin/create', async (req, res) => {
     const savedProject = await newProject.save();
     
     console.log('✅ Project created successfully:', savedProject.name);
-    console.log('🔗 Project URLs:', {
-      liveUrl: savedProject.liveUrl,
-      githubUrl: savedProject.githubUrl,
-      demoUrl: savedProject.demoUrl
-    });
     
     res.status(201).json({
       success: true,
@@ -93,10 +120,11 @@ router.post('/admin/create', async (req, res) => {
   }
 });
 
-// ✅ PUT /projects/admin/update/:id - Update project
-router.put('/admin/update/:id', async (req, res) => {
+// PUT /api/projects/admin/:id - Update project (FIXED PATH)
+router.put('/admin/:id', async (req, res) => {
   try {
-    console.log('✏️ PUT /projects/admin/update/', req.params.id);
+    console.log('✏️ PUT /api/projects/admin/', req.params.id);
+    console.log('👤 Request by admin:', req.user.email);
     console.log('📦 Update data:', req.body);
     
     if (!req.params.id.match(/^[0-9a-fA-F]{24}$/)) {
@@ -112,7 +140,7 @@ router.put('/admin/update/:id', async (req, res) => {
       technologies: req.body.technologies || [],
       githubUrl: req.body.githubUrl || '',
       liveUrl: req.body.liveUrl || '',
-      demoUrl: req.body.demoUrl || '', // ✅ Ensure demoUrl is included
+      demoUrl: req.body.demoUrl || '',
       featured: req.body.featured || false,
       image: req.body.image || ''
     };
@@ -125,11 +153,6 @@ router.put('/admin/update/:id', async (req, res) => {
 
     if (updatedProject) {
       console.log('✅ Project updated successfully:', updatedProject.name);
-      console.log('🔗 Updated URLs:', {
-        liveUrl: updatedProject.liveUrl,
-        githubUrl: updatedProject.githubUrl,
-        demoUrl: updatedProject.demoUrl
-      });
       
       res.json({
         success: true,
@@ -161,10 +184,11 @@ router.put('/admin/update/:id', async (req, res) => {
   }
 });
 
-// ✅ DELETE /projects/admin/delete/:id - Delete project
-router.delete('/admin/delete/:id', async (req, res) => {
+// DELETE /api/projects/admin/:id - Delete project (FIXED PATH)
+router.delete('/admin/:id', async (req, res) => {
   try {
-    console.log('🗑️ DELETE /projects/admin/delete/', req.params.id);
+    console.log('🗑️ DELETE /api/projects/admin/', req.params.id);
+    console.log('👤 Request by admin:', req.user.email);
     
     if (!req.params.id.match(/^[0-9a-fA-F]{24}$/)) {
       return res.status(400).json({
@@ -180,7 +204,7 @@ router.delete('/admin/delete/:id', async (req, res) => {
       res.json({
         success: true,
         message: 'Project deleted successfully',
-        deletedProject: {
+        data: {
           id: deletedProject._id,
           name: deletedProject.name
         }
@@ -202,18 +226,18 @@ router.delete('/admin/delete/:id', async (req, res) => {
   }
 });
 
-// ✅ PATCH /projects/admin/fix-demo-urls - Fix existing projects missing demoUrl
+// KEEP YOUR EXISTING UTILITY ROUTES (they're fine)
+// PATCH /api/projects/admin/fix-demo-urls - Fix existing projects missing demoUrl
 router.patch('/admin/fix-demo-urls', async (req, res) => {
   try {
     console.log('🔧 PATCH: Fixing projects missing demoUrl field...');
+    console.log('👤 Request by admin:', req.user.email);
     
     const projects = await Project.find({});
     let updatedCount = 0;
     
     for (let project of projects) {
-      // Check if demoUrl is missing or undefined
       if (project.demoUrl === undefined || project.demoUrl === null) {
-        // Set demoUrl to empty string if it's missing
         await Project.findByIdAndUpdate(
           project._id,
           { $set: { demoUrl: '' } },
@@ -226,19 +250,10 @@ router.patch('/admin/fix-demo-urls', async (req, res) => {
     
     console.log(`🎉 Fixed ${updatedCount} projects`);
     
-    // Get updated projects to verify
-    const updatedProjects = await Project.find({});
-    
     res.json({
       success: true,
       message: `Updated ${updatedCount} projects with demoUrl field`,
-      updatedCount,
-      projects: updatedProjects.map(p => ({
-        name: p.name,
-        liveUrl: p.liveUrl,
-        githubUrl: p.githubUrl,
-        demoUrl: p.demoUrl
-      }))
+      updatedCount
     });
   } catch (error) {
     console.error('❌ Error fixing demo URLs:', error);
@@ -250,97 +265,13 @@ router.patch('/admin/fix-demo-urls', async (req, res) => {
   }
 });
 
-// ✅ PATCH /projects/admin/fix-all-urls - Force update all projects with missing URL fields
-router.patch('/admin/fix-all-urls', async (req, res) => {
-  try {
-    console.log('🔧 FORCE FIX: Adding missing URL fields to all projects...');
-    
-    const projects = await Project.find({});
-    let updatedCount = 0;
-    
-    for (let project of projects) {
-      let needsUpdate = false;
-      const updateData = {};
-      
-      // Check and fix demoUrl
-      if (project.demoUrl === undefined || project.demoUrl === null) {
-        updateData.demoUrl = '';
-        needsUpdate = true;
-        console.log(`📝 Adding demoUrl to: ${project.name}`);
-      }
-      
-      // Check and fix liveUrl
-      if (project.liveUrl === undefined || project.liveUrl === null) {
-        updateData.liveUrl = '';
-        needsUpdate = true;
-        console.log(`📝 Adding liveUrl to: ${project.name}`);
-      }
-      
-      // Check and fix githubUrl
-      if (project.githubUrl === undefined || project.githubUrl === null) {
-        updateData.githubUrl = '';
-        needsUpdate = true;
-        console.log(`📝 Adding githubUrl to: ${project.name}`);
-      }
-      
-      if (needsUpdate) {
-        await Project.findByIdAndUpdate(
-          project._id,
-          { $set: updateData },
-          { new: true }
-        );
-        updatedCount++;
-        console.log(`✅ Updated project: ${project.name}`);
-      }
-    }
-    
-    console.log(`🎉 Force fixed ${updatedCount} projects`);
-    
-    // Get updated projects to verify
-    const updatedProjects = await Project.find({});
-    
-    res.json({
-      success: true,
-      message: `Force updated ${updatedCount} projects with missing URL fields`,
-      updatedCount,
-      projects: updatedProjects.map(p => ({
-        name: p.name,
-        liveUrl: p.liveUrl,
-        githubUrl: p.githubUrl,
-        demoUrl: p.demoUrl,
-        hasLiveUrl: p.liveUrl !== undefined,
-        hasGithubUrl: p.githubUrl !== undefined,
-        hasDemoUrl: p.demoUrl !== undefined
-      }))
-    });
-  } catch (error) {
-    console.error('❌ Error force fixing URLs:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Error force fixing URLs',
-      error: error.message
-    });
-  }
-});
-
-// ✅ GET /projects/debug - Debug route to check project data
+// GET /api/projects/debug - Debug route (public)
 router.get('/debug', async (req, res) => {
   try {
-    console.log('🐛 GET /projects/debug - Debugging projects data...');
+    console.log('🐛 GET /api/projects/debug - Debugging projects data...');
     const projects = await Project.find({}).sort({ createdAt: -1 });
     
-    console.log('🔍 ALL PROJECTS DATA:');
-    projects.forEach((project, index) => {
-      console.log(`Project ${index + 1}:`, {
-        name: project.name,
-        liveUrl: project.liveUrl,
-        githubUrl: project.githubUrl,
-        demoUrl: project.demoUrl,
-        hasLiveUrl: !!project.liveUrl,
-        hasGithubUrl: !!project.githubUrl,
-        hasDemoUrl: !!project.demoUrl
-      });
-    });
+    console.log(`🔍 Found ${projects.length} projects for debugging`);
     
     res.json({
       success: true,
@@ -352,8 +283,7 @@ router.get('/debug', async (req, res) => {
         githubUrl: p.githubUrl,
         demoUrl: p.demoUrl,
         featured: p.featured,
-        technologies: p.technologies,
-        createdAt: p.createdAt
+        technologies: p.technologies
       }))
     });
   } catch (error) {
@@ -366,38 +296,5 @@ router.get('/debug', async (req, res) => {
   }
 });
 
-// ✅ API ROUTES (for /api/projects prefix)
-
-// GET /api/projects - Get projects for public
-router.get('/', async (req, res) => {
-  try {
-    console.log('📡 GET /api/projects - Fetching projects...');
-    const projects = await Project.find({}).sort({ createdAt: -1 });
-    console.log(`✅ Found ${projects.length} projects for frontend`);
-    
-    // Log URL data for debugging
-    projects.forEach((project, index) => {
-      console.log(`Project ${index + 1} "${project.name}":`, {
-        liveUrl: project.liveUrl,
-        githubUrl: project.githubUrl,
-        demoUrl: project.demoUrl
-      });
-    });
-    
-    res.json({
-      success: true,
-      data: projects,
-      count: projects.length
-    });
-  } catch (error) {
-    console.error('❌ Error fetching projects:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Error fetching projects',
-      error: error.message
-    });
-  }
-});
-
-console.log('✅ Projects routes initialized');
+console.log('✅ Projects routes initialized with proper API structure');
 module.exports = router;
