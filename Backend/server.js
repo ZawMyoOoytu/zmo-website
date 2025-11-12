@@ -1,4 +1,4 @@
-// backend/server.js - COMPLETE FIXED VERSION WITH PROPER ROUTE ORDERING
+// backend/server.js - COMPLETE FIXED VERSION WITH MONGODB CONNECTION
 const express = require('express');
 const cors = require('cors');
 const mongoose = require('mongoose');
@@ -28,6 +28,92 @@ console.log('🚀 Starting ZMO Backend Server on Render...');
 console.log('🌍 Environment:', NODE_ENV);
 console.log('🔧 Node Version:', process.version);
 console.log('📊 Process ID:', process.pid);
+
+// ==========================================
+// 🗄️ MONGODB DATABASE CONNECTION
+// ==========================================
+
+const connectDB = async () => {
+  try {
+    console.log('🔗 Attempting MongoDB connection...');
+    
+    if (!process.env.MONGODB_URI) {
+      throw new Error('❌ MONGODB_URI environment variable is not defined');
+    }
+
+    // Log masked MongoDB URI for debugging (don't log full URI in production)
+    const maskedUri = process.env.MONGODB_URI.replace(/mongodb\+srv:\/\/([^:]+):([^@]+)/, 'mongodb+srv://$1:****');
+    console.log('📡 Connecting to MongoDB:', maskedUri);
+    
+    const conn = await mongoose.connect(process.env.MONGODB_URI, {
+      useNewUrlParser: true,
+      useUnifiedTopology: true,
+      serverSelectionTimeoutMS: 10000,
+      socketTimeoutMS: 45000,
+      retryWrites: true,
+      w: 'majority'
+    });
+
+    console.log(`✅ MongoDB Connected Successfully!`);
+    console.log(`   Host: ${conn.connection.host}`);
+    console.log(`   Database: ${conn.connection.name}`);
+    console.log(`   Port: ${conn.connection.port}`);
+    console.log(`   Ready State: ${conn.connection.readyState === 1 ? 'Connected' : 'Disconnected'}`);
+    
+    // Connection event listeners
+    mongoose.connection.on('error', err => {
+      console.error('❌ MongoDB connection error:', err.message);
+    });
+
+    mongoose.connection.on('disconnected', () => {
+      console.log('⚠️ MongoDB disconnected - attempting to reconnect...');
+    });
+
+    mongoose.connection.on('reconnected', () => {
+      console.log('✅ MongoDB reconnected successfully');
+    });
+
+    // Graceful shutdown
+    process.on('SIGINT', async () => {
+      await mongoose.connection.close();
+      console.log('🛑 MongoDB connection closed due to app termination');
+      process.exit(0);
+    });
+    
+  } catch (error) {
+    console.error('❌ Failed to connect to MongoDB:', error.message);
+    console.log('💡 Troubleshooting tips:');
+    console.log('   1. Check MONGODB_URI in Render environment variables');
+    console.log('   2. Verify MongoDB Atlas network access (allow all IPs: 0.0.0.0/0)');
+    console.log('   3. Check database user credentials in MongoDB Atlas');
+    console.log('   4. Ensure database cluster is running in MongoDB Atlas');
+    console.log('   5. Check if password contains special characters that need URL encoding');
+    
+    // More specific error handling
+    if (error.name === 'MongoServerSelectionError') {
+      console.error('🚫 Network error - cannot reach MongoDB servers');
+    } else if (error.name === 'MongoParseError') {
+      console.error('🔤 Connection string format error');
+    } else if (error.name === 'MongoNetworkError') {
+      console.error('🌐 Network connectivity issue');
+    } else if (error.message.includes('bad auth')) {
+      console.error('🔑 Authentication failed - check username/password');
+    }
+    
+    process.exit(1);
+  }
+};
+
+// Database state helper function
+function getDBState(readyState) {
+  const states = {
+    0: 'disconnected',
+    1: 'connected', 
+    2: 'connecting',
+    3: 'disconnecting'
+  };
+  return states[readyState] || 'unknown';
+}
 
 // ==========================================
 // 🌐 ENHANCED CORS CONFIGURATION FOR RENDER + VERCEL
@@ -152,18 +238,28 @@ app.use((req, res, next) => {
 // 🏠 HEALTH & STATUS ENDPOINTS
 // ==========================================
 app.get('/api/health', async (req, res) => {
+  const dbStatus = mongoose.connection.readyState === 1 ? 'Connected' : 'Disconnected';
+  const dbState = getDBState(mongoose.connection.readyState);
+
   const healthData = {
-    status: 'OK',
+    status: dbStatus === 'Connected' ? 'OK' : 'Degraded',
     message: `ZMO Backend Server running on Render in ${NODE_ENV} mode`,
     server: {
       environment: NODE_ENV,
       platform: 'Render',
       nodeVersion: process.version,
-      uptime: process.uptime()
+      uptime: process.uptime(),
+      database: dbState
+    },
+    database: {
+      status: dbState,
+      readyState: mongoose.connection.readyState,
+      host: mongoose.connection.host || 'Not connected',
+      name: mongoose.connection.name || 'Not connected'
     },
     routes: {
-      blogs: '✅ Working',
-      projects: '✅ Working', 
+      blogs: dbStatus === 'Connected' ? '✅ Working' : '⚠️ Limited',
+      projects: dbStatus === 'Connected' ? '✅ Working' : '⚠️ Limited', 
       auth: '✅ Available'
     },
     timestamp: new Date().toISOString(),
@@ -174,15 +270,41 @@ app.get('/api/health', async (req, res) => {
 });
 
 app.get('/api/status', (req, res) => {
+  const dbStatus = mongoose.connection.readyState === 1 ? 'Connected' : 'Disconnected';
+  
   res.json({
     success: true,
     service: 'ZMO Backend API on Render',
-    status: 'operational',
+    status: dbStatus === 'Connected' ? 'operational' : 'degraded',
     environment: NODE_ENV,
     deployment: 'Render',
+    database: getDBState(mongoose.connection.readyState),
     timestamp: new Date().toISOString(),
     requestId: req.requestId
   });
+});
+
+// Database debug endpoint
+app.get('/api/debug/db', (req, res) => {
+  const dbInfo = {
+    database: {
+      readyState: mongoose.connection.readyState,
+      state: getDBState(mongoose.connection.readyState),
+      host: mongoose.connection.host,
+      name: mongoose.connection.name,
+      port: mongoose.connection.port,
+      models: Object.keys(mongoose.models)
+    },
+    environment: {
+      nodeEnv: process.env.NODE_ENV,
+      mongodbUriSet: !!process.env.MONGODB_URI,
+      mongodbUriLength: process.env.MONGODB_URI ? process.env.MONGODB_URI.length : 0
+    },
+    timestamp: new Date().toISOString(),
+    requestId: req.requestId
+  };
+
+  res.json(dbInfo);
 });
 
 // ==========================================
@@ -197,7 +319,8 @@ app.get('/api/simple', (req, res) => {
       {
         id: 1,
         title: 'Simple Test Endpoint',
-        message: 'This endpoint is working correctly'
+        message: 'This endpoint is working correctly',
+        database: getDBState(mongoose.connection.readyState)
       }
     ],
     count: 1,
@@ -217,7 +340,8 @@ app.get('/api/debug/routes', (req, res) => {
     status: '/api/status',
     dashboard: '/api/admin/dashboard/stats',
     simple: '/api/simple',
-    debug: '/api/debug/routes'
+    debug: '/api/debug/routes',
+    dbDebug: '/api/debug/db'
   };
 
   res.json({
@@ -226,6 +350,7 @@ app.get('/api/debug/routes', (req, res) => {
     testRoutes,
     environment: NODE_ENV,
     backend: 'Render',
+    database: getDBState(mongoose.connection.readyState),
     timestamp: new Date().toISOString(),
     requestId: req.requestId
   });
@@ -264,6 +389,7 @@ app.get('/api/blogs', (req, res) => {
     ],
     count: 2,
     message: '✅ Blog API is working!',
+    database: getDBState(mongoose.connection.readyState),
     timestamp: new Date().toISOString(),
     requestId: req.requestId
   });
@@ -287,6 +413,7 @@ app.get('/api/blogs/:id', (req, res) => {
       updatedAt: new Date().toISOString()
     },
     message: '✅ Single blog route working',
+    database: getDBState(mongoose.connection.readyState),
     requestId: req.requestId
   });
 });
@@ -328,6 +455,7 @@ app.get('/api/projects', (req, res) => {
     ],
     count: 2,
     message: '✅ Projects API is working!',
+    database: getDBState(mongoose.connection.readyState),
     timestamp: new Date().toISOString(),
     requestId: req.requestId
   });
@@ -349,6 +477,7 @@ app.get('/api/projects/:id', (req, res) => {
       updatedAt: new Date().toISOString()
     },
     message: '✅ Single project route working',
+    database: getDBState(mongoose.connection.readyState),
     requestId: req.requestId
   });
 });
@@ -436,6 +565,7 @@ app.post('/api/auth/login', async (req, res) => {
         permissions: user.permissions
       },
       expiresIn: '24h',
+      database: getDBState(mongoose.connection.readyState),
       requestId: req.requestId
     };
 
@@ -493,6 +623,7 @@ app.get('/api/auth/verify', async (req, res) => {
           role: user.role,
           permissions: user.permissions
         },
+        database: getDBState(mongoose.connection.readyState),
         requestId: req.requestId
       });
     });
@@ -526,7 +657,8 @@ app.get('/api/admin/dashboard/stats', (req, res) => {
       server: {
         status: 'healthy',
         responseTime: '125ms',
-        uptime: process.uptime()
+        uptime: process.uptime(),
+        database: getDBState(mongoose.connection.readyState)
       }
     },
     requestId: req.requestId,
@@ -546,9 +678,10 @@ app.get('/', (req, res) => {
     version: '2.1.0',
     environment: NODE_ENV,
     deployment: 'Render',
+    database: getDBState(mongoose.connection.readyState),
     timestamp: new Date().toISOString(),
     requestId: req.requestId,
-    status: 'operational',
+    status: mongoose.connection.readyState === 1 ? 'operational' : 'degraded',
     routes: {
       health: 'GET /api/health',
       blogs: 'GET /api/blogs',
@@ -556,7 +689,8 @@ app.get('/', (req, res) => {
       auth: 'POST /api/auth/login',
       dashboard: 'GET /api/admin/dashboard/stats',
       simple: 'GET /api/simple',
-      debug: 'GET /api/debug/routes'
+      debug: 'GET /api/debug/routes',
+      dbDebug: 'GET /api/debug/db'
     },
     demo: {
       login: {
@@ -587,7 +721,8 @@ app.use('/api/*', (req, res) => {
     '/api/projects/:id',
     '/api/admin/dashboard/stats',
     '/api/simple',
-    '/api/debug/routes'
+    '/api/debug/routes',
+    '/api/debug/db'
   ];
   
   res.status(404).json({
@@ -596,7 +731,8 @@ app.use('/api/*', (req, res) => {
     message: `API route ${req.originalUrl} does not exist`,
     timestamp: new Date().toISOString(),
     requestId: req.requestId,
-    availableRoutes: availableRoutes
+    availableRoutes: availableRoutes,
+    database: getDBState(mongoose.connection.readyState)
   });
 });
 
@@ -609,15 +745,20 @@ app.use((error, req, res, next) => {
     error: 'Internal Server Error',
     message: isProduction ? 'Something went wrong' : error.message,
     requestId: req.requestId,
+    database: getDBState(mongoose.connection.readyState),
     timestamp: new Date().toISOString()
   });
 });
 
 // ==========================================
-// 🚀 SERVER STARTUP
+// 🚀 SERVER STARTUP WITH DATABASE
 // ==========================================
 const startServer = async () => {
   try {
+    // First connect to database
+    await connectDB();
+    
+    // Then start the server
     const server = app.listen(PORT, '0.0.0.0', () => {
       console.log('\n🎉 ==========================================');
       console.log('🚀 ZMO Backend Server Started Successfully!');
@@ -625,14 +766,15 @@ const startServer = async () => {
       console.log(`📍 Port: ${PORT}`);
       console.log(`🌍 Environment: ${NODE_ENV}`);
       console.log(`🏢 Platform: Render`);
+      console.log(`🗄️ Database: ${mongoose.connection.readyState === 1 ? 'Connected ✅' : 'Disconnected ❌'}`);
       console.log(`🛣️  Routes: All endpoints working ✅`);
       console.log('==========================================\n');
       
       console.log('🔗 Test these URLs:');
       console.log(`   • Health: ${RENDER_URL}/api/health`);
+      console.log(`   • Database Debug: ${RENDER_URL}/api/debug/db`);
       console.log(`   • Blogs: ${RENDER_URL}/api/blogs`);
       console.log(`   • Projects: ${RENDER_URL}/api/projects`);
-      console.log(`   • Simple: ${RENDER_URL}/api/simple`);
       console.log(`   • Debug: ${RENDER_URL}/api/debug/routes`);
     });
   } catch (error) {
