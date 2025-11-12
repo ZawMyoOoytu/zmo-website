@@ -1,0 +1,188 @@
+{
+  "version": 2,
+  "name": "zmo-admin-panel",
+  "buildCommand": "npm run build",
+  "outputDirectory": "dist",
+  "installCommand": "npm install",
+  "framework": "vite",
+  "functions": {
+    "**/*.js": {
+      "maxDuration": 30
+    }
+  },
+  "env": {
+    "VITE_API_BASE_URL": "https://zmo-backend.onrender.com/api",
+    "VITE_API_URL": "https://zmo-backend.onrender.com",
+    "VITE_ADMIN_URL": "https://zmo-admin.vercel.app",
+    "VITE_FRONTEND_URL": "https://zmo-frontend.vercel.app",
+    "VITE_WEBSITE_URL": "https://zmo-website.vercel.app",
+    "VITE_DASHBOARD_URL": "https://zmo-dashboard.vercel.app",
+    "VITE_APP_ENV": "production",
+    "VITE_APP_VERSION": "2.0.0",
+    "VITE_DEPLOYMENT_PLATFORM": "vercel",
+    "VITE_BACKEND_PLATFORM": "render",
+    "VITE_ANALYTICS_ENABLED": "true",
+    "VITE_DEBUG_MODE": "false",
+    "VITE_ADMIN_TITLE": "ZMO Admin Dashboard",
+    "VITE_COMPANY_NAME": "ZMO Digital Solutions",
+    "VITE_SUPPORT_EMAIL": "support@zmo.com",
+    "VITE_DEMO_MODE": "false",
+    "VITE_DEMO_EMAIL": "admin@zmo.com",
+    "VITE_DEMO_PASSWORD": "password"
+  },
+  "build": {
+    "env": {
+      "VITE_API_BASE_URL": "https://zmo-backend.onrender.com/api",
+      "VITE_APP_ENV": "production",
+      "VITE_DEBUG_MODE": "false"
+    }
+  },
+  "routes": [
+    {
+      "src": "/assets/(.*)",
+      "headers": {
+        "cache-control": "public, immutable, max-age=31536000"
+      },
+      "continue": true
+    },
+    {
+      "src": "/api/(.*)",
+      "dest": "https://zmo-backend.onrender.com/api/$1",
+      "methods": ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"]
+    },
+    {
+      "src": "/(.*)",
+      "dest": "/index.html"
+    }
+  ],
+  "headers": [
+    {
+      "source": "/(.*)",
+      "headers": [
+        {
+          "key": "X-Content-Type-Options",
+          "value": "nosniff"
+        },
+        {
+          "key": "X-Frame-Options",
+          "value": "DENY"
+        },
+        {
+          "key": "X-XSS-Protection",
+          "value": "1; mode=block"
+        },
+        {
+          "key": "Referrer-Policy",
+          "value": "strict-origin-when-cross-origin"
+        },
+        {
+          "key": "Permissions-Policy",
+          "value": "camera=(), microphone=(), geolocation=(), interest-cohort=()"
+        },
+        {
+          "key": "Strict-Transport-Security",
+          "value": "max-age=31536000; includeSubDomains"
+        }
+      ]
+    },
+    {
+      "source": "/assets/(.*)",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "public, immutable, max-age=31536000"
+        }
+      ]
+    },
+    {
+      "source": "/(.*).js",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=31536000, immutable"
+        },
+        {
+          "key": "Content-Type",
+          "value": "application/javascript; charset=utf-8"
+        }
+      ]
+    },
+    {
+      "source": "/(.*).css",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=31536000, immutable"
+        },
+        {
+          "key": "Content-Type",
+          "value": "text/css; charset=utf-8"
+        }
+      ]
+    },
+    {
+      "source": "/static/(.*)",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=31536000, immutable"
+        }
+      ]
+    }
+  ],
+  "redirects": [
+    {
+      "source": "/",
+      "destination": "/dashboard",
+      "permanent": false
+    },
+    {
+      "source": "/home",
+      "destination": "/dashboard",
+      "permanent": true
+    },
+    {
+      "source": "/admin",
+      "destination": "/dashboard",
+      "permanent": true
+    },
+    {
+      "source": "/login",
+      "destination": "/auth/login",
+      "permanent": false
+    },
+    {
+      "source": "/logout",
+      "destination": "/auth/logout",
+      "permanent": false
+    }
+  ],
+  "rewrites": [
+    {
+      "source": "/api/:path*",
+      "destination": "https://zmo-backend.onrender.com/api/:path*"
+    }
+  ],
+  "cors": {
+    "allowedOrigins": [
+      "https://zmo-admin.vercel.app",
+      "https://zmo-frontend.vercel.app",
+      "https://zmo-website.vercel.app",
+      "https://zmo-dashboard.vercel.app",
+      "https://zmo-backend.onrender.com"
+    ],
+    "allowedMethods": ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
+    "allowedHeaders": ["Content-Type", "Authorization", "X-Requested-With", "Accept"],
+    "allowCredentials": true
+  },
+  "git": {
+    "deploymentEnabled": {
+      "main": true,
+      "develop": true,
+      "preview": true
+    }
+  },
+  "regions": ["all"],
+  "public": true,
+  "trailingSlash": false
+}

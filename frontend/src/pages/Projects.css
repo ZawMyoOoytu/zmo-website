@@ -1,0 +1,171 @@
+/* Add these styles to your existing Projects.css */
+
+/* Project Description Styles */
+.description-section {
+  margin-bottom: 15px;
+}
+
+.project-description {
+  color: #64748b;
+  line-height: 1.6;
+  margin-bottom: 10px;
+  font-size: 14px;
+}
+
+.read-more-btn {
+  background: none;
+  border: none;
+  color: #667eea;
+  font-weight: 600;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 14px;
+  padding: 8px 0;
+  transition: color 0.3s ease;
+  margin: 10px 0;
+}
+
+.read-more-btn:hover {
+  color: #5a67d8;
+}
+
+/* Expanded Content */
+.expanded-content {
+  animation: slideDown 0.3s ease;
+  margin-top: 15px;
+  padding-top: 15px;
+  border-top: 1px solid #e2e8f0;
+}
+
+@keyframes slideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.full-description h4 {
+  color: #374151;
+  margin-bottom: 10px;
+  font-size: 1rem;
+  font-weight: 600;
+}
+
+.full-description p {
+  color: #4a5568;
+  line-height: 1.7;
+  font-size: 14px;
+  margin-bottom: 20px;
+}
+
+/* Project Links */
+.project-links h4 {
+  color: #374151;
+  margin-bottom: 10px;
+  font-size: 1rem;
+  font-weight: 600;
+}
+
+.links-container {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.project-links.compact {
+  margin-top: 15px;
+}
+
+.project-links.compact .links-container {
+  justify-content: center;
+}
+
+.project-link {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 16px;
+  border-radius: 8px;
+  font-weight: 600;
+  text-decoration: none;
+  font-size: 14px;
+  transition: all 0.3s ease;
+  border: 2px solid transparent;
+}
+
+.project-link.live-demo {
+  background: #667eea;
+  color: white;
+  border-color: #667eea;
+}
+
+.project-link.live-demo:hover {
+  background: #5a67d8;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
+}
+
+.project-link.github {
+  background: #1e293b;
+  color: white;
+  border-color: #1e293b;
+}
+
+.project-link.github:hover {
+  background: #0f172a;
+  transform: translateY(-2px);
+}
+
+.project-link.demo {
+  background: #10b981;
+  color: white;
+  border-color: #10b981;
+}
+
+.project-link.demo:hover {
+  background: #059669;
+  transform: translateY(-2px);
+}
+
+/* Project Meta */
+.project-meta {
+  display: flex;
+  gap: 20px;
+  margin-top: 15px;
+  padding-top: 15px;
+  border-top: 1px solid #f1f5f9;
+}
+
+.meta-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: #64748b;
+  font-size: 13px;
+}
+
+.meta-item i {
+  color: #667eea;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+  .links-container {
+    flex-direction: column;
+  }
+  
+  .project-link {
+    justify-content: center;
+  }
+  
+  .project-meta {
+    flex-direction: column;
+    gap: 10px;
+  }
+}
