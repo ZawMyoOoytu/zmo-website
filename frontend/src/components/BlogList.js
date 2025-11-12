@@ -1,207 +1,145 @@
-// frontend/src/components/BlogList.js - COMPLETELY FIXED VERSION
-import React, { useState, useEffect, useCallback } from 'react';
+// frontend/src/components/BlogList.js - COMPLETE FIXED VERSION
+import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
+import { publicAPI } from '../services/api'; // ✅ Use publicAPI for frontend
 import './BlogList.css';
 
-function BlogList() {
+const BlogList = () => {
   const [blogs, setBlogs] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [retryCount, setRetryCount] = useState(0);
-
-  // Get API base URL from environment variables
-  const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || 'https://zmo-backend.onrender.com/api';
-
-  // Fetch blogs function - FIXED: removed retryCount dependency
-  const fetchBlogs = useCallback(async () => {
-    try {
-      setLoading(true);
-      setError('');
-
-      console.log('📡 Fetching blogs from:', `${API_BASE_URL}/blogs/simple`);
-
-      // Try the simple endpoint first
-      const response = await fetch(`${API_BASE_URL}/blogs/simple`, {
-        method: 'GET',
-        headers: { 
-          'Content-Type': 'application/json',
-          'Accept': 'application/json',
-        },
-      });
-
-      console.log('📊 Response status:', response.status, response.statusText);
-
-      if (!response.ok) {
-        if (response.status === 404) {
-          console.log('🔄 Simple endpoint not found, trying main blogs endpoint...');
-          // Try the main blogs endpoint
-          const mainResponse = await fetch(`${API_BASE_URL}/blogs`, {
-            method: 'GET',
-            headers: { 
-              'Content-Type': 'application/json',
-              'Accept': 'application/json',
-            },
-          });
-
-          if (mainResponse.ok) {
-            const mainData = await mainResponse.json();
-            processBlogData(mainData);
-            return;
-          }
-        }
-        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-      }
-
-      const result = await response.json();
-      console.log('✅ API Response received');
-      processBlogData(result);
-
-    } catch (err) {
-      console.error('❌ Error fetching blogs:', err);
-      
-      let errorMessage = err.message;
-      if (err.message.includes('Failed to fetch') || err.message.includes('NetworkError')) {
-        errorMessage = 'Cannot connect to the server. Please check your internet connection.';
-      } else if (err.message.includes('404')) {
-        errorMessage = 'Blog endpoints not found. The server might be updating.';
-      }
-      
-      setError(errorMessage);
-      setBlogs([]); // Clear any previous data
-    } finally {
-      setLoading(false);
-    }
-  }, [API_BASE_URL]); // FIXED: Removed retryCount dependency
-
-  // Process blog data from different response structures
-  const processBlogData = (result) => {
-    console.log('📝 Processing blog data:', result);
-    
-    let blogsData = [];
-    
-    // Handle different response structures
-    if (result && Array.isArray(result.data)) {
-      blogsData = result.data;
-    } else if (result && Array.isArray(result.blogs)) {
-      blogsData = result.blogs;
-    } else if (Array.isArray(result)) {
-      blogsData = result;
-    } else if (result && result.success && Array.isArray(result.data)) {
-      blogsData = result.data;
-    } else if (result && result.success && Array.isArray(result.blogs)) {
-      blogsData = result.blogs;
-    }
-
-    console.log(`✅ Processed ${blogsData.length} blogs`);
-    
-    // Filter only published blogs if needed
-    const publishedBlogs = blogsData.filter(blog => 
-      blog.published !== false && blog.published !== undefined
-    );
-    
-    setBlogs(publishedBlogs.length > 0 ? publishedBlogs : blogsData);
-
-    if (blogsData.length === 0) {
-      setError('No blog posts found in the database.');
-    } else {
-      setError(''); // Clear any previous errors
-    }
-  };
+  const [searchTerm, setSearchTerm] = useState('');
+  const [filteredBlogs, setFilteredBlogs] = useState([]);
 
   useEffect(() => {
-    fetchBlogs();
-  }, [fetchBlogs, retryCount]); // FIXED: Added retryCount here instead
+    const fetchBlogs = async () => {
+      try {
+        setLoading(true);
+        setError('');
+        console.log('📚 Fetching all blogs...');
+        
+        // ✅ FIXED: Use publicAPI.getBlogs() for frontend
+        const result = await publicAPI.getBlogs();
+        console.log('✅ Blogs API response:', result);
+        
+        let blogsArray = [];
+        
+        // ✅ Handle the correct response structure
+        if (result && result.success && Array.isArray(result.data)) {
+          blogsArray = result.data;
+        } else if (result && Array.isArray(result.data)) {
+          blogsArray = result.data;
+        } else if (Array.isArray(result)) {
+          blogsArray = result;
+        } else {
+          console.warn('⚠️ Unexpected response format:', result);
+          setError('Unexpected data format from server');
+        }
 
-  const handleRetry = () => {
-    setRetryCount(prev => prev + 1);
+        // Filter only published blogs
+        const publishedBlogs = blogsArray.filter(blog => blog.published !== false);
+        console.log(`✅ Found ${publishedBlogs.length} published blogs`);
+        
+        setBlogs(publishedBlogs);
+        setFilteredBlogs(publishedBlogs);
+        
+      } catch (error) {
+        console.error('❌ Error fetching blogs:', error);
+        setError(error.message || 'Failed to load blog posts');
+        setBlogs([]);
+        setFilteredBlogs([]);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchBlogs();
+  }, []);
+
+  // Search and filter functionality
+  useEffect(() => {
+    if (searchTerm.trim() === '') {
+      setFilteredBlogs(blogs);
+    } else {
+      const filtered = blogs.filter(blog =>
+        blog.title?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        blog.excerpt?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        blog.content?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        blog.tags?.some(tag => tag.toLowerCase().includes(searchTerm.toLowerCase())) ||
+        blog.author?.toLowerCase().includes(searchTerm.toLowerCase())
+      );
+      setFilteredBlogs(filtered);
+    }
+  }, [searchTerm, blogs]);
+
+  // Format date
+  const formatDate = (dateString) => {
+    if (!dateString) return 'Unknown date';
+    
+    const options = { 
+      year: 'numeric', 
+      month: 'long', 
+      day: 'numeric' 
+    };
+    return new Date(dateString).toLocaleDateString('en-US', options);
   };
 
-  const handleRefresh = () => {
+  // Handle retry
+  const handleRetry = () => {
     window.location.reload();
   };
 
-  // Helper functions
-  const createExcerpt = (content, wordLimit = 25) => {
-    if (!content) return 'No content available';
-    const plainText = content.replace(/<[^>]*>/g, '');
-    const words = plainText.split(' ');
-    return words.length > wordLimit ? words.slice(0, wordLimit).join(' ') + '...' : plainText;
+  // Clear search
+  const handleClearSearch = () => {
+    setSearchTerm('');
   };
 
-  const formatDate = (dateString) => {
-    try {
-      return new Date(dateString).toLocaleDateString('en-US', {
-        year: 'numeric',
-        month: 'long',
-        day: 'numeric',
-      });
-    } catch {
-      return 'Unknown date';
-    }
-  };
-
-  const getImageUrl = (blog) => {
-    if (blog.imageUrl) return blog.imageUrl;
-    if (blog.image) return blog.image;
-    if (blog.featuredImage) return blog.featuredImage;
-    return null;
-  };
-
-  // FIXED: Image error handler without optional chaining
-  const handleImageError = (e) => {
-    e.target.style.display = 'none';
-    const nextSibling = e.target.nextElementSibling;
-    if (nextSibling) {
-      nextSibling.style.display = 'block';
-    }
-  };
-
-  // Render loading state
   if (loading) {
     return (
-      <div className="blog-list">
-        <div className="loading">
-          <div className="spinner"></div>
-          <p>Loading blogs from live database...</p>
-          <p className="loading-url">Fetching from: {API_BASE_URL}/blogs/simple</p>
-          <p className="loading-note">If this takes too long, the backend might be starting up...</p>
+      <div className="blog-list-page">
+        <div className="container">
+          <div className="page-header">
+            <h1>Our Blog</h1>
+            <p>Discover insights, innovations, and ideas</p>
+          </div>
+          <div className="loading-state">
+            <div className="loading-spinner"></div>
+            <h2>Loading Blog Posts...</h2>
+            <p>Please wait while we fetch the latest content</p>
+          </div>
         </div>
       </div>
     );
   }
 
-  // Render error state
-  if (error && blogs.length === 0) {
+  if (error) {
     return (
-      <div className="blog-list">
-        <div className="error-message">
-          <div className="error-icon">⚠️</div>
-          <h3>📝 ZMO Blog</h3>
-          <p className="error-text">{error}</p>
-          <div className="error-actions">
-            <button onClick={handleRetry} className="retry-btn primary">
-              🔄 Try Again
-            </button>
-            <button onClick={handleRefresh} className="retry-btn secondary">
-              🔃 Refresh Page
-            </button>
+      <div className="blog-list-page">
+        <div className="container">
+          <div className="page-header">
+            <h1>Our Blog</h1>
+            <p>Discover insights, innovations, and ideas</p>
           </div>
-          <div className="backend-info">
-            <h4>Connection Details:</h4>
-            <div className="connection-detail">
-              <strong>Backend URL:</strong> {API_BASE_URL.replace('/api', '')}
+          <div className="error-state">
+            <div className="error-icon">
+              <i className="fas fa-exclamation-triangle"></i>
             </div>
-            <div className="connection-detail">
-              <strong>Current Endpoint:</strong> /api/blogs/simple
+            <h2>Unable to Load Blogs</h2>
+            <p className="error-message">{error}</p>
+            
+            <div className="error-details">
+              <p><strong>Backend URL:</strong> {process.env.REACT_APP_API_URL || 'https://zmo-backend.onrender.com'}</p>
+              <p><strong>Current Endpoint:</strong> /api/blogs</p>
+              <p><strong>Admin Panel:</strong> {window.location.origin}/admin</p>
             </div>
-            <div className="connection-detail">
-              <strong>Alternative:</strong> /api/blogs
-            </div>
-            <div className="connection-detail">
-              <strong>Admin Panel:</strong> {process.env.REACT_APP_ADMIN_URL || 'https://zmo-admin.vercel.app'}
-            </div>
-            <div className="connection-detail">
-              <strong>Retry Attempt:</strong> {retryCount + 1}
+            
+            <div className="error-actions">
+              <button onClick={handleRetry} className="btn btn-primary">
+                <i className="fas fa-redo"></i> Try Again
+              </button>
+              <Link to="/" className="btn btn-outline">
+                <i className="fas fa-home"></i> Go Home
+              </Link>
             </div>
           </div>
         </div>
@@ -209,130 +147,169 @@ function BlogList() {
     );
   }
 
-  // Render blog list
   return (
-    <div className="blog-list">
-      <header className="blog-header">
-        <h1>📝 ZMO Blog</h1>
-        <p className="blog-subtitle">Latest insights and updates from our team</p>
-        <div className="blog-stats">
-          <p className="blog-count">Showing {blogs.length} post{blogs.length !== 1 ? 's' : ''}</p>
-          <p className="blog-source">📍 Connected to live database</p>
+    <div className="blog-list-page">
+      <div className="container">
+        {/* Page Header */}
+        <div className="page-header">
+          <h1>Our Blog</h1>
+          <p>Discover insights, innovations, and ideas from CYBARCSOFT</p>
         </div>
-      </header>
 
-      {error && (
-        <div className="warning-message">
-          <p>⚠️ {error}</p>
-        </div>
-      )}
-
-      {blogs.length === 0 ? (
-        <div className="no-blogs">
-          <div className="no-blogs-icon">📄</div>
-          <h3>No blog posts yet</h3>
-          <p>Blog posts will appear here once they are published from the admin panel.</p>
-          <div className="admin-link">
-            <a 
-              href={process.env.REACT_APP_ADMIN_URL || 'https://zmo-admin.vercel.app'} 
-              target="_blank" 
-              rel="noopener noreferrer"
-              className="admin-btn"
-            >
-              👉 Visit Admin Panel to create posts
-            </a>
+        {/* Search and Filter Section */}
+        <div className="search-section">
+          <div className="search-box">
+            <i className="fas fa-search"></i>
+            <input
+              type="text"
+              placeholder="Search blog posts..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="search-input"
+            />
+            {searchTerm && (
+              <button 
+                onClick={handleClearSearch}
+                className="clear-search"
+                aria-label="Clear search"
+              >
+                <i className="fas fa-times"></i>
+              </button>
+            )}
+          </div>
+          
+          <div className="results-info">
+            <span className="results-count">
+              {filteredBlogs.length} {filteredBlogs.length === 1 ? 'post' : 'posts'} 
+              {searchTerm && ` matching "${searchTerm}"`}
+            </span>
           </div>
         </div>
-      ) : (
-        <div className="blogs-grid">
-          {blogs.map(blog => (
-            <article key={blog._id || blog.id} className="blog-card">
-              {getImageUrl(blog) && (
-                <div className="blog-image">
-                  <img 
-                    src={getImageUrl(blog)} 
-                    alt={blog.title} 
-                    onError={handleImageError} // FIXED: Using the safe function
-                  />
-                  <div className="image-fallback" style={{display: 'none'}}>
-                    <span>📝</span>
-                  </div>
-                </div>
-              )}
 
-              <div className="blog-content">
-                <h2 className="blog-title">{blog.title || 'Untitled Post'}</h2>
-                <p className="blog-excerpt">
-                  {blog.excerpt || createExcerpt(blog.content || 'No content available')}
-                </p>
-                
-                <div className="blog-meta">
-                  <span className="blog-date">
-                    📅 {formatDate(blog.createdAt || blog.createdDate || blog.date)}
-                  </span>
-                  {blog.author && (
-                    <span className="blog-author">👤 {blog.author}</span>
+        {/* Blog Posts Grid */}
+        {filteredBlogs.length > 0 ? (
+          <div className="blogs-grid">
+            {filteredBlogs.map(blog => (
+              <article key={blog._id} className="blog-card">
+                {/* Blog Image */}
+                <div className="blog-card-image">
+                  {blog.featuredImage || blog.image ? (
+                    <img 
+                      src={blog.featuredImage || blog.image} 
+                      alt={blog.title}
+                      loading="lazy"
+                    />
+                  ) : (
+                    <div className="image-placeholder">
+                      <i className="fas fa-newspaper"></i>
+                    </div>
                   )}
                 </div>
-                
-                {blog.tags && blog.tags.length > 0 && (
-                  <div className="blog-tags">
-                    {blog.tags.slice(0, 3).map((tag, index) => (
-                      <span key={index} className="tag">#{tag}</span>
-                    ))}
-                    {blog.tags.length > 3 && (
-                      <span className="tag-more">+{blog.tags.length - 3} more</span>
+
+                {/* Blog Content */}
+                <div className="blog-card-content">
+                  {/* Blog Meta */}
+                  <div className="blog-card-meta">
+                    <span className="blog-date">
+                      <i className="fas fa-calendar"></i>
+                      {formatDate(blog.createdAt)}
+                    </span>
+                    <span className="blog-author">
+                      <i className="fas fa-user"></i>
+                      {blog.author || 'Admin'}
+                    </span>
+                    {blog.readTime && (
+                      <span className="blog-read-time">
+                        <i className="fas fa-clock"></i>
+                        {blog.readTime} min read
+                      </span>
                     )}
                   </div>
-                )}
-                
-                <Link 
-                  to={`/blog/${blog._id || blog.id}`} 
-                  className="read-more-btn"
-                  state={{ blog }}
-                >
-                  Read Full Article →
-                </Link>
-              </div>
-            </article>
-          ))}
-        </div>
-      )}
 
-      {/* Debug info - only show in development */}
-      {process.env.NODE_ENV === 'development' && (
-        <div className="debug-info">
-          <details>
-            <summary>Debug Information</summary>
-            <div className="debug-content">
-              <p><strong>Backend URL:</strong> {API_BASE_URL}</p>
-              <p><strong>Total Posts:</strong> {blogs.length}</p>
-              <p><strong>Retry Count:</strong> {retryCount}</p>
-              <button 
-                onClick={() => {
-                  console.log('Blogs data:', blogs);
-                  console.log('API Base URL:', API_BASE_URL);
-                  alert('Check browser console for detailed data');
-                }}
-                className="debug-btn"
-              >
-                View Raw Data in Console
-              </button>
+                  {/* Blog Title */}
+                  <h2 className="blog-card-title">
+                    <Link to={`/blog/${blog._id}`}>
+                      {blog.title || 'Untitled Blog'}
+                    </Link>
+                  </h2>
+
+                  {/* Blog Excerpt */}
+                  <p className="blog-card-excerpt">
+                    {blog.excerpt || (blog.content && blog.content.substring(0, 150) + '...') || 'No content available'}
+                  </p>
+
+                  {/* Blog Tags */}
+                  {blog.tags && blog.tags.length > 0 && (
+                    <div className="blog-card-tags">
+                      {blog.tags.slice(0, 3).map((tag, index) => (
+                        <span key={index} className="blog-tag">
+                          #{tag}
+                        </span>
+                      ))}
+                      {blog.tags.length > 3 && (
+                        <span className="blog-tag-more">
+                          +{blog.tags.length - 3} more
+                        </span>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Read More Button */}
+                  <div className="blog-card-actions">
+                    <Link to={`/blog/${blog._id}`} className="read-more-btn">
+                      Read More <i className="fas fa-arrow-right"></i>
+                    </Link>
+                  </div>
+                </div>
+              </article>
+            ))}
+          </div>
+        ) : searchTerm ? (
+          <div className="empty-search-state">
+            <div className="empty-icon">
+              <i className="fas fa-search"></i>
             </div>
-          </details>
-        </div>
-      )}
+            <h3>No matching posts found</h3>
+            <p>We couldn't find any blog posts matching "<strong>{searchTerm}</strong>"</p>
+            <div className="empty-actions">
+              <button onClick={handleClearSearch} className="btn btn-primary">
+                Clear Search
+              </button>
+              <Link to="/blogs" className="btn btn-outline">
+                View All Posts
+              </Link>
+            </div>
+          </div>
+        ) : (
+          <div className="empty-state">
+            <div className="empty-icon">
+              <i className="fas fa-newspaper"></i>
+            </div>
+            <h3>No Blog Posts Available</h3>
+            <p>There are no published blog posts at the moment.</p>
+            <p className="subtext">Check back soon for new content or contact the administrator.</p>
+            <div className="empty-actions">
+              <Link to="/admin" className="btn btn-outline">
+                <i className="fas fa-cog"></i>
+                Admin Panel
+              </Link>
+              <Link to="/" className="btn btn-outline">
+                <i className="fas fa-home"></i>
+                Go Home
+              </Link>
+            </div>
+          </div>
+        )}
 
-      {/* Refresh button for production */}
-      {process.env.NODE_ENV !== 'development' && (
-        <div className="refresh-section">
-          <button onClick={handleRefresh} className="refresh-btn">
-            🔄 Refresh Blog List
-          </button>
+        {/* Back to Home */}
+        <div className="page-footer">
+          <Link to="/" className="btn btn-outline">
+            <i className="fas fa-arrow-left"></i> Back to Home
+          </Link>
         </div>
-      )}
+      </div>
     </div>
   );
-}
+};
 
 export default BlogList;

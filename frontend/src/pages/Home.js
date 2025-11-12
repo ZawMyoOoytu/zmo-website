@@ -1,11 +1,13 @@
+// frontend/src/pages/Home.js - COMPLETELY FIXED VERSION
 import React, { useState, useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
-import { blogAPI } from '../services/api';
+import { publicAPI } from '../services/api'; // ✅ FIXED: Use publicAPI instead of blogAPI
 import './Home.css';
 
 const Home = () => {
   const [recentBlogs, setRecentBlogs] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
   const [isDragging, setIsDragging] = useState(false);
   const [startX, setStartX] = useState(0);
   const [scrollLeft, setScrollLeft] = useState(0);
@@ -15,43 +17,38 @@ const Home = () => {
     const fetchRecentBlogs = async () => {
       try {
         setLoading(true);
-        console.log('Fetching recent blogs...');
+        setError('');
+        console.log('📚 Fetching recent blogs...');
         
-        // Use getBlogs() instead of getPublishedBlogs()
-        const result = await blogAPI.getBlogs();
-        console.log('Blogs API response:', result);
+        // ✅ FIXED: Use publicAPI.getBlogs() instead of blogAPI.getBlogs()
+        const result = await publicAPI.getBlogs();
+        console.log('✅ Blogs API response:', result);
         
-        // Handle different response structures
-        let blogs = result;
+        let blogs = [];
         
-        if (result && result.data) {
+        // ✅ FIXED: Handle the correct response structure from publicAPI
+        if (result && result.success && Array.isArray(result.data)) {
           blogs = result.data;
-        }
-        
-        if (result && Array.isArray(result)) {
+          console.log(`✅ Found ${blogs.length} blogs`);
+        } else if (result && Array.isArray(result.data)) {
+          blogs = result.data;
+        } else if (Array.isArray(result)) {
           blogs = result;
-        }
-        
-        if (result && result.blogs) {
-          blogs = result.blogs;
-        }
-        
-        if (result && result.success && result.data) {
-          blogs = result.data;
+        } else {
+          console.warn('⚠️ Unexpected response format:', result);
+          setError('Unexpected data format from server');
         }
 
-        // Ensure we have an array and take first 3
-        if (Array.isArray(blogs)) {
-          const recent = blogs.slice(0, 3);
-          console.log('Setting recent blogs:', recent);
-          setRecentBlogs(recent);
-        } else {
-          console.error('Unexpected blogs format:', blogs);
-          setRecentBlogs([]);
-        }
+        // Filter published blogs and take first 3
+        const publishedBlogs = blogs.filter(blog => blog.published !== false);
+        const recent = publishedBlogs.slice(0, 3);
+        
+        console.log('✅ Setting recent blogs:', recent);
+        setRecentBlogs(recent);
         
       } catch (error) {
-        console.error('Error fetching recent blogs:', error);
+        console.error('❌ Error fetching recent blogs:', error);
+        setError(error.message || 'Failed to load blog posts');
         setRecentBlogs([]);
       } finally {
         setLoading(false);
@@ -125,6 +122,11 @@ const Home = () => {
     }
   };
 
+  // Retry loading blogs
+  const retryLoading = () => {
+    window.location.reload();
+  };
+
   if (loading) {
     return (
       <div className="home">
@@ -137,7 +139,10 @@ const Home = () => {
         <section className="recent-section bg-light">
           <div className="container">
             <h2>Recent Blog Posts</h2>
-            <div className="loading">Loading blogs...</div>
+            <div className="loading">
+              <div className="loading-spinner"></div>
+              <p>Loading blogs...</p>
+            </div>
           </div>
         </section>
       </div>
@@ -146,7 +151,7 @@ const Home = () => {
 
   return (
     <div className="home">
-      {/* Your existing hero section */}
+      {/* Hero Section */}
       <section className="hero">
         <div className="container">
           <h1>Welcome to CYBARCSOFT</h1>
@@ -163,14 +168,35 @@ const Home = () => {
         <div className="container">
           <h2>Recent Blog Posts</h2>
           
-          {recentBlogs.length > 0 ? (
+          {error ? (
+            <div className="error-state">
+              <div className="error-icon">
+                <i className="fas fa-exclamation-triangle"></i>
+              </div>
+              <h3>Unable to Load Blogs</h3>
+              <p>{error}</p>
+              <div className="error-details">
+                <p><strong>Backend URL:</strong> {process.env.REACT_APP_API_URL || 'https://zmo-backend.onrender.com'}</p>
+                <p><strong>Current Endpoint:</strong> /api/blogs</p>
+                <p><strong>Admin Panel:</strong> {window.location.origin}/admin</p>
+              </div>
+              <div className="error-actions">
+                <button onClick={retryLoading} className="btn btn-primary">
+                  🔄 Try Again
+                </button>
+                <button onClick={() => window.location.reload()} className="btn btn-outline">
+                  🔃 Refresh Page
+                </button>
+              </div>
+            </div>
+          ) : recentBlogs.length > 0 ? (
             <div className="blogs-container">
               <div className="drag-indicator">
                 <i className="fas fa-arrows-alt-h"></i>
                 Drag to explore more posts
               </div>
               
-              <button className="nav-arrow prev" onClick={() => scroll(-1)}>
+              <button className="nav-arrow prev" onClick={() => scroll(-1)} aria-label="Previous posts">
                 <i className="fas fa-chevron-left"></i>
               </button>
               
@@ -188,8 +214,12 @@ const Home = () => {
                 {recentBlogs.map(blog => (
                   <div key={blog._id} className="blog-preview-card">
                     <div className="blog-card-image">
-                      {blog.image ? (
-                        <img src={blog.image} alt={blog.title} />
+                      {blog.featuredImage || blog.image ? (
+                        <img 
+                          src={blog.featuredImage || blog.image} 
+                          alt={blog.title} 
+                          loading="lazy"
+                        />
                       ) : (
                         <div className="image-placeholder">
                           <i className="fas fa-newspaper"></i>
@@ -200,18 +230,39 @@ const Home = () => {
                     <div className="blog-card-content">
                       <h3>{blog.title || 'Untitled Blog'}</h3>
                       <p className="blog-excerpt">
-                        {blog.excerpt || blog.content?.substring(0, 120) + '...' || 'No content available'}
+                        {blog.excerpt || (blog.content && blog.content.substring(0, 120) + '...') || 'No content available'}
                       </p>
+                      
+                      {/* Blog Meta Information */}
+                      <div className="blog-meta">
+                        <span className="blog-author">
+                          <i className="fas fa-user"></i>
+                          {blog.author || 'Admin'}
+                        </span>
+                        {blog.readTime && (
+                          <span className="blog-read-time">
+                            <i className="fas fa-clock"></i>
+                            {blog.readTime} min read
+                          </span>
+                        )}
+                      </div>
+                      
                       <div className="blog-card-footer">
                         <Link 
-                          to={`/blogs/${blog._id}`} 
+                          to={`/blog/${blog._id}`} 
                           className="read-more"
+                          state={{ fromHome: true }}
                         >
                           Read More <i className="fas fa-arrow-right"></i>
                         </Link>
                         <span className="blog-date">
+                          <i className="fas fa-calendar"></i>
                           {blog.createdAt ? 
-                            new Date(blog.createdAt).toLocaleDateString() : 
+                            new Date(blog.createdAt).toLocaleDateString('en-US', {
+                              year: 'numeric',
+                              month: 'short',
+                              day: 'numeric'
+                            }) : 
                             'Unknown date'
                           }
                         </span>
@@ -221,22 +272,58 @@ const Home = () => {
                 ))}
               </div>
               
-              <button className="nav-arrow next" onClick={() => scroll(1)}>
+              <button className="nav-arrow next" onClick={() => scroll(1)} aria-label="Next posts">
                 <i className="fas fa-chevron-right"></i>
               </button>
             </div>
           ) : (
             <div className="empty-state">
-              <i className="fas fa-newspaper"></i>
-              <p>No blog posts available.</p>
-              <p className="subtext">Check back soon for new content!</p>
+              <div className="empty-icon">
+                <i className="fas fa-newspaper"></i>
+              </div>
+              <h3>No Blog Posts Available</h3>
+              <p>There are no published blog posts at the moment.</p>
+              <p className="subtext">Check back soon for new content or contact the administrator.</p>
+              <div className="empty-actions">
+                <Link to="/admin" className="btn btn-outline">
+                  <i className="fas fa-cog"></i>
+                  Admin Panel
+                </Link>
+              </div>
             </div>
           )}
           
-          <div className="section-footer">
-            <Link to="/blogs" className="btn btn-outline">
-              View All Blog Posts
-            </Link>
+          {recentBlogs.length > 0 && (
+            <div className="section-footer">
+              <Link to="/blogs" className="btn btn-outline">
+                <i className="fas fa-list"></i>
+                View All Blog Posts ({recentBlogs.length})
+              </Link>
+            </div>
+          )}
+        </div>
+      </section>
+
+      {/* Additional Sections can be added here */}
+      <section className="features-section">
+        <div className="container">
+          <h2>Why Choose CYBARCSOFT?</h2>
+          <div className="features-grid">
+            <div className="feature-card">
+              <i className="fas fa-lightbulb"></i>
+              <h3>Innovative Solutions</h3>
+              <p>Cutting-edge algorithmic approaches to modern challenges</p>
+            </div>
+            <div className="feature-card">
+              <i className="fas fa-graduation-cap"></i>
+              <h3>Education Focus</h3>
+              <p>Bridging technology with politics, media, and education</p>
+            </div>
+            <div className="feature-card">
+              <i className="fas fa-rocket"></i>
+              <h3>ICT Platforms</h3>
+              <p>Modern technology platforms for impactful solutions</p>
+            </div>
           </div>
         </div>
       </section>
