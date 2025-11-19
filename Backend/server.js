@@ -1,4 +1,4 @@
-// backend/server.js - COMPLETE FIXED VERSION WITH MONGODB BLOG ROUTES
+// backend/server.js - COMPLETE FIXED VERSION WITH UPDATED CORS
 const express = require('express');
 const cors = require('cors');
 const mongoose = require('mongoose');
@@ -173,12 +173,49 @@ console.log('🌐 CORS Configuration:', {
   totalOrigins: allowedOrigins.length
 });
 
-// CORS configuration
+// ✅ FIXED CORS CONFIGURATION - ADD MISSING HEADERS
 app.use(cors({
-  origin: allowedOrigins,
+  origin: function (origin, callback) {
+    // Allow requests with no origin (like mobile apps or curl requests)
+    if (!origin) return callback(null, true);
+    
+    if (allowedOrigins.some(allowedOrigin => {
+      if (allowedOrigin.includes('*')) {
+        const regex = new RegExp(allowedOrigin.replace(/\*/g, '.*'));
+        return regex.test(origin);
+      }
+      return allowedOrigin === origin;
+    })) {
+      callback(null, true);
+    } else {
+      console.log('🚫 CORS Blocked Origin:', origin);
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH', 'HEAD'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept']
+  allowedHeaders: [
+    'Content-Type', 
+    'Authorization', 
+    'X-Requested-With', 
+    'Accept',
+    'x-environment',  
+    'x-platform',      // ✅ ADD THIS - Missing header causing error
+    'x-client',        // ✅ ADD THIS
+    'x-client-version', // ✅ ADD THIS
+    'x-request-id',    // ✅ ADD THIS
+    'x-client-timestamp', // ✅ ADD THIS
+    'x-requested-with',
+    'cache-control',
+    'postman-token',
+    'user-agent'
+  ],
+  exposedHeaders: [
+    'Content-Length',
+    'Content-Type',
+    'X-Request-ID'
+  ],
+  maxAge: 86400 // 24 hours
 }));
 
 // Enhanced pre-flight requests handler
