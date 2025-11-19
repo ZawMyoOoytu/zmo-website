@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import './Sidebar.css';
 
-const Sidebar = ({ networkError }) => {
+const Sidebar = ({ networkError, onAdminPanelClick }) => {
   const location = useLocation();
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [hoveredItem, setHoveredItem] = useState(null);
@@ -32,6 +32,13 @@ const Sidebar = ({ networkError }) => {
     return location.pathname.startsWith(path);
   };
 
+  const handleAdminPanelClick = (e) => {
+    e.preventDefault();
+    if (onAdminPanelClick) {
+      onAdminPanelClick();
+    }
+  };
+
   return (
     <>
       {networkError && (
@@ -49,14 +56,20 @@ const Sidebar = ({ networkError }) => {
       )}
 
       <aside className={`sidebar ${isCollapsed ? 'collapsed' : ''}`}>
-        {/* Header */}
+        {/* Header with clickable Admin Panel */}
         <div className="sidebar-header">
           <div className="logo-container">
             <div className="logo">
               <span className="logo-icon">⚡</span>
               {!isCollapsed && (
                 <div className="logo-text">
-                  <h3>AdminHub</h3>
+                  <h3 
+                    className="admin-panel-clickable"
+                    onClick={handleAdminPanelClick}
+                    title="Click to move sidebar to other side"
+                  >
+                    Admin Panel
+                  </h3>
                   <span className="logo-subtitle">Dashboard</span>
                 </div>
               )}

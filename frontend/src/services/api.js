@@ -18,7 +18,7 @@ const getApiConfig = () => {
   } else {
     return {
       baseURL: process.env.REACT_APP_API_URL || 'https://zmo-backend.onrender.com/api',
-      timeout: 20000,
+      timeout: 30000, // Increased timeout for Render
       debug: false
     };
   }
@@ -56,6 +56,13 @@ api.interceptors.request.use(
     if (apiConfig.debug) {
       console.log(`🚀 API Request: ${config.method?.toUpperCase()} ${config.baseURL}${config.url}`);
     }
+    
+    // Add auth token if available
+    const token = localStorage.getItem('adminToken') || sessionStorage.getItem('adminToken');
+    if (token && config.headers) {
+      config.headers.Authorization = `Bearer ${token}`;
+    }
+    
     return config;
   },
   (error) => {
@@ -79,7 +86,8 @@ api.interceptors.response.use(
       url: error.config?.url,
       method: error.config?.method,
       status: error.response?.status,
-      message: error.response?.data?.message || error.message
+      message: error.message,
+      code: error.code
     };
     
     console.error('❌ API Error:', errorInfo);
@@ -100,6 +108,11 @@ const handleApiError = (error) => {
   switch (status) {
     case 401:
       console.log('🔐 Unauthorized - Invalid or expired token');
+      // Clear invalid tokens
+      localStorage.removeItem('adminToken');
+      localStorage.removeItem('adminUser');
+      sessionStorage.removeItem('adminToken');
+      sessionStorage.removeItem('adminUser');
       break;
     case 403:
       console.log('🚫 Forbidden - Insufficient permissions');
@@ -123,6 +136,8 @@ const handleApiError = (error) => {
         console.log('🌐 Network Error - Cannot connect to backend');
       } else if (error.code === 'TIMEOUT') {
         console.log('⏰ Timeout - Request took too long');
+      } else if (error.message?.includes('CORS')) {
+        console.log('🚫 CORS Error - Check backend CORS configuration');
       }
       break;
   }
@@ -161,30 +176,48 @@ const publicAPI = {
     } catch (error) {
       console.error('❌ Failed to fetch blogs:', error.message);
       
+      // Enhanced error information
+      const enhancedError = new Error(`Failed to load blogs: ${error.message}`);
+      enhancedError.originalError = error;
+      enhancedError.isNetworkError = !error.response;
+      
       // Fallback data for development
-      if (isDevelopment) {
+      if (isDevelopment && !error.response) {
+        console.log('🔄 Using development fallback data');
         return {
           success: true,
           data: [
             {
               _id: 'dev-1',
-              title: 'Development Blog Post',
-              excerpt: 'This is sample content for development environment',
-              content: 'This content is served from fallback data while the backend connects.',
+              title: 'Development Blog Post - Sample 1',
+              excerpt: 'This is sample content for development environment while backend connects.',
+              content: 'This content is served from fallback data while the backend connects. Your backend might be starting up or experiencing connection issues.',
               author: 'Developer',
               published: true,
-              tags: ['development', 'sample'],
+              tags: ['development', 'sample', 'react'],
               readTime: 3,
+              createdAt: new Date().toISOString(),
+              updatedAt: new Date().toISOString()
+            },
+            {
+              _id: 'dev-2',
+              title: 'Development Blog Post - Sample 2',
+              excerpt: 'Another sample blog post for development and testing.',
+              content: 'This is another sample blog post that appears when the backend is not available. Check your backend deployment and CORS settings.',
+              author: 'Developer',
+              published: true,
+              tags: ['javascript', 'webdev', 'tutorial'],
+              readTime: 5,
               createdAt: new Date().toISOString(),
               updatedAt: new Date().toISOString()
             }
           ],
-          count: 1,
-          message: 'Development fallback data'
+          count: 2,
+          message: 'Development fallback data - Backend connection failed'
         };
       }
       
-      throw error;
+      throw enhancedError;
     }
   },
 
@@ -208,27 +241,31 @@ const publicAPI = {
     } catch (error) {
       console.error(`❌ Failed to fetch blog ${id}:`, error.message);
       
+      // Enhanced error information
+      const enhancedError = new Error(`Failed to load blog: ${error.message}`);
+      enhancedError.originalError = error;
+      
       // Fallback for development
-      if (isDevelopment) {
+      if (isDevelopment && !error.response) {
         return {
           success: true,
           data: {
             _id: id,
             title: 'Development Blog Post',
-            content: 'This is fallback content for development environment.',
-            excerpt: 'Development blog excerpt',
+            content: 'This is fallback content for development environment. The backend server might be starting or experiencing connection issues.',
+            excerpt: 'Development blog excerpt for testing purposes.',
             author: 'Developer',
             published: true,
-            tags: ['development'],
+            tags: ['development', 'sample', 'fallback'],
             readTime: 5,
             createdAt: new Date().toISOString(),
             updatedAt: new Date().toISOString()
           },
-          message: 'Development fallback data'
+          message: 'Development fallback data - Backend connection failed'
         };
       }
       
-      throw error;
+      throw enhancedError;
     }
   },
 
@@ -252,8 +289,12 @@ const publicAPI = {
     } catch (error) {
       console.error('❌ Failed to fetch projects:', error.message);
       
+      // Enhanced error information
+      const enhancedError = new Error(`Failed to load projects: ${error.message}`);
+      enhancedError.originalError = error;
+      
       // Fallback data for development
-      if (isDevelopment) {
+      if (isDevelopment && !error.response) {
         return {
           success: true,
           data: [
@@ -269,11 +310,11 @@ const publicAPI = {
             }
           ],
           count: 1,
-          message: 'Development fallback data'
+          message: 'Development fallback data - Backend connection failed'
         };
       }
       
-      throw error;
+      throw enhancedError;
     }
   },
 
@@ -292,7 +333,7 @@ const publicAPI = {
   testConnection: async () => {
     try {
       console.log('🔗 Testing backend connection...');
-      const response = await api.get('/health');
+      const response = await api.get('/blogs'); // Using blogs endpoint since health might not exist
       
       console.log('✅ Backend connection successful');
       return { 
@@ -306,7 +347,8 @@ const publicAPI = {
       return { 
         success: false, 
         error: error.message,
-        message: 'Cannot connect to backend server'
+        message: 'Cannot connect to backend server',
+        isNetworkError: !error.response
       };
     }
   }
@@ -337,6 +379,9 @@ const authAPI = {
           sessionStorage.setItem('adminUser', JSON.stringify(user));
         }
         
+        // Update axios default headers
+        api.defaults.headers.common['Authorization'] = `Bearer ${token}`;
+        
         console.log('✅ Login successful');
         return { success: true, user, token, message };
       } else {
@@ -358,6 +403,9 @@ const authAPI = {
       sessionStorage.removeItem('adminToken');
       sessionStorage.removeItem('adminUser');
       
+      // Remove from axios headers
+      delete api.defaults.headers.common['Authorization'];
+      
       console.log('✅ Logout successful');
       return { success: true, message: 'Logout successful' };
     } catch (error) {
@@ -378,6 +426,10 @@ const authAPI = {
   
   isAuthenticated: () => {
     return !!(localStorage.getItem('adminToken') || sessionStorage.getItem('adminToken'));
+  },
+  
+  getToken: () => {
+    return localStorage.getItem('adminToken') || sessionStorage.getItem('adminToken');
   }
 };
 
@@ -390,10 +442,7 @@ const blogsAPI = {
     try {
       console.log('🔐 Fetching admin blogs...');
       
-      const token = localStorage.getItem('adminToken') || sessionStorage.getItem('adminToken');
-      const config = token ? { headers: { Authorization: `Bearer ${token}` } } : {};
-      
-      const response = await api.get('/blogs', config);
+      const response = await api.get('/blogs');
       
       if (response.data.success) {
         console.log(`✅ Found ${response.data.data?.length || 0} blogs`);
@@ -416,14 +465,7 @@ const blogsAPI = {
     try {
       console.log('📝 Creating new blog...');
       
-      const token = localStorage.getItem('adminToken') || sessionStorage.getItem('adminToken');
-      if (!token) {
-        throw new Error('Authentication required');
-      }
-      
-      const response = await api.post('/blogs', blogData, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
+      const response = await api.post('/blogs', blogData);
       
       if (response.data.success) {
         console.log('✅ Blog created successfully');
@@ -442,14 +484,7 @@ const blogsAPI = {
     try {
       console.log(`✏️ Updating blog ${id}...`);
       
-      const token = localStorage.getItem('adminToken') || sessionStorage.getItem('adminToken');
-      if (!token) {
-        throw new Error('Authentication required');
-      }
-      
-      const response = await api.put(`/blogs/${id}`, blogData, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
+      const response = await api.put(`/blogs/${id}`, blogData);
       
       if (response.data.success) {
         console.log('✅ Blog updated successfully');
@@ -468,14 +503,7 @@ const blogsAPI = {
     try {
       console.log(`🗑️ Deleting blog ${id}...`);
       
-      const token = localStorage.getItem('adminToken') || sessionStorage.getItem('adminToken');
-      if (!token) {
-        throw new Error('Authentication required');
-      }
-      
-      const response = await api.delete(`/blogs/${id}`, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
+      const response = await api.delete(`/blogs/${id}`);
       
       if (response.data.success) {
         console.log('✅ Blog deleted successfully');
@@ -498,10 +526,7 @@ const dashboardAPI = {
     try {
       console.log('📊 Fetching dashboard statistics...');
       
-      const token = localStorage.getItem('adminToken') || sessionStorage.getItem('adminToken');
-      const config = token ? { headers: { Authorization: `Bearer ${token}` } } : {};
-      
-      const response = await api.get('/admin/dashboard/stats', config);
+      const response = await api.get('/admin/dashboard/stats');
       
       if (response.data.success) {
         console.log('✅ Dashboard stats fetched successfully');
@@ -541,10 +566,7 @@ const projectsAPI = {
     try {
       console.log('🔐 Fetching admin projects...');
       
-      const token = localStorage.getItem('adminToken') || sessionStorage.getItem('adminToken');
-      const config = token ? { headers: { Authorization: `Bearer ${token}` } } : {};
-      
-      const response = await api.get('/projects', config);
+      const response = await api.get('/projects');
       
       if (response.data.success) {
         console.log(`✅ Found ${response.data.data?.length || 0} projects`);
@@ -566,14 +588,7 @@ const projectsAPI = {
     try {
       console.log('📝 Creating new project...');
       
-      const token = localStorage.getItem('adminToken') || sessionStorage.getItem('adminToken');
-      if (!token) {
-        throw new Error('Authentication required');
-      }
-      
-      const response = await api.post('/projects', projectData, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
+      const response = await api.post('/projects', projectData);
       
       if (response.data.success) {
         console.log('✅ Project created successfully');
@@ -591,14 +606,7 @@ const projectsAPI = {
     try {
       console.log(`✏️ Updating project ${id}...`);
       
-      const token = localStorage.getItem('adminToken') || sessionStorage.getItem('adminToken');
-      if (!token) {
-        throw new Error('Authentication required');
-      }
-      
-      const response = await api.put(`/projects/${id}`, projectData, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
+      const response = await api.put(`/projects/${id}`, projectData);
       
       if (response.data.success) {
         console.log('✅ Project updated successfully');
@@ -616,14 +624,7 @@ const projectsAPI = {
     try {
       console.log(`🗑️ Deleting project ${id}...`);
       
-      const token = localStorage.getItem('adminToken') || sessionStorage.getItem('adminToken');
-      if (!token) {
-        throw new Error('Authentication required');
-      }
-      
-      const response = await api.delete(`/projects/${id}`, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
+      const response = await api.delete(`/projects/${id}`);
       
       if (response.data.success) {
         console.log('✅ Project deleted successfully');
@@ -659,6 +660,12 @@ console.log('🚀 ZMO API Service Initialized -', {
   environment: process.env.NODE_ENV,
   baseURL: apiConfig.baseURL
 });
+
+// Initialize auth token if exists
+const initialToken = authAPI.getToken();
+if (initialToken) {
+  api.defaults.headers.common['Authorization'] = `Bearer ${initialToken}`;
+}
 
 // Test backend connection on app start
 if (isDevelopment) {

@@ -1,7 +1,7 @@
-// frontend/src/components/BlogList.js - COMPLETE FIXED VERSION
+// frontend/src/components/BlogList.js - ENHANCED DEBUG VERSION
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { publicAPI } from '../services/api'; // ✅ Use publicAPI for frontend
+import { publicAPI } from '../services/api';
 import './BlogList.css';
 
 const BlogList = () => {
@@ -10,42 +10,80 @@ const BlogList = () => {
   const [error, setError] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
   const [filteredBlogs, setFilteredBlogs] = useState([]);
+  const [debugInfo, setDebugInfo] = useState('');
 
   useEffect(() => {
     const fetchBlogs = async () => {
       try {
         setLoading(true);
         setError('');
-        console.log('📚 Fetching all blogs...');
+        setDebugInfo('🔄 Fetching blogs from backend...');
+        console.log('📚 Frontend: Fetching all blogs...');
         
-        // ✅ FIXED: Use publicAPI.getBlogs() for frontend
+        // Enhanced API call with detailed logging
         const result = await publicAPI.getBlogs();
-        console.log('✅ Blogs API response:', result);
+        console.log('🔍 Frontend API Response:', result);
+        
+        setDebugInfo(`✅ API Response Received - Success: ${result.success}`);
         
         let blogsArray = [];
         
-        // ✅ Handle the correct response structure
-        if (result && result.success && Array.isArray(result.data)) {
-          blogsArray = result.data;
+        // Enhanced response structure handling
+        if (result && result.success) {
+          if (Array.isArray(result.data)) {
+            blogsArray = result.data;
+            console.log(`✅ Found ${result.data.length} blogs in result.data`);
+          } else if (Array.isArray(result.blogs)) {
+            blogsArray = result.blogs;
+            console.log(`✅ Found ${result.blogs.length} blogs in result.blogs`);
+          } else {
+            console.warn('⚠️ Unexpected successful response structure:', result);
+            setDebugInfo('⚠️ Success but unexpected data structure');
+          }
         } else if (result && Array.isArray(result.data)) {
+          // Handle case where success might be missing but data exists
           blogsArray = result.data;
+          console.log(`✅ Found ${result.data.length} blogs (success field missing)`);
         } else if (Array.isArray(result)) {
+          // Handle case where response is directly the array
           blogsArray = result;
+          console.log(`✅ Found ${result.length} blogs (direct array response)`);
         } else {
           console.warn('⚠️ Unexpected response format:', result);
           setError('Unexpected data format from server');
+          setDebugInfo('❌ Unexpected response format');
         }
 
-        // Filter only published blogs
-        const publishedBlogs = blogsArray.filter(blog => blog.published !== false);
-        console.log(`✅ Found ${publishedBlogs.length} published blogs`);
+        // Debug: Log what we received
+        console.log('📊 Raw blogs array:', blogsArray);
+        console.log('🔍 First blog sample:', blogsArray[0]);
+
+        // Filter only published blogs with enhanced logic
+        const publishedBlogs = blogsArray.filter(blog => {
+          const isPublished = blog.published !== false && blog.published !== 'false';
+          console.log(`📝 Blog "${blog.title}" - published: ${blog.published}, isPublished: ${isPublished}`);
+          return isPublished;
+        });
+        
+        console.log(`✅ Found ${publishedBlogs.length} published blogs out of ${blogsArray.length} total`);
+        setDebugInfo(`📊 Loaded ${publishedBlogs.length} published blogs`);
         
         setBlogs(publishedBlogs);
         setFilteredBlogs(publishedBlogs);
         
+        // If no blogs found, log detailed info
+        if (publishedBlogs.length === 0) {
+          console.warn('❌ No published blogs found. Possible issues:');
+          console.warn('- All blogs might be unpublished (published: false)');
+          console.warn('- Backend might be returning empty array');
+          console.warn('- API endpoint might have no data');
+          setDebugInfo(prev => prev + ' - ⚠️ No published blogs found');
+        }
+        
       } catch (error) {
         console.error('❌ Error fetching blogs:', error);
         setError(error.message || 'Failed to load blog posts');
+        setDebugInfo(`❌ Error: ${error.message}`);
         setBlogs([]);
         setFilteredBlogs([]);
       } finally {
@@ -76,12 +114,16 @@ const BlogList = () => {
   const formatDate = (dateString) => {
     if (!dateString) return 'Unknown date';
     
-    const options = { 
-      year: 'numeric', 
-      month: 'long', 
-      day: 'numeric' 
-    };
-    return new Date(dateString).toLocaleDateString('en-US', options);
+    try {
+      const options = { 
+        year: 'numeric', 
+        month: 'long', 
+        day: 'numeric' 
+      };
+      return new Date(dateString).toLocaleDateString('en-US', options);
+    } catch (error) {
+      return 'Invalid date';
+    }
   };
 
   // Handle retry
@@ -92,6 +134,20 @@ const BlogList = () => {
   // Clear search
   const handleClearSearch = () => {
     setSearchTerm('');
+  };
+
+  // Test API manually
+  const testAPI = async () => {
+    try {
+      setDebugInfo('🧪 Testing API directly...');
+      const response = await fetch('https://zmo-backend.onrender.com/api/blogs');
+      const data = await response.json();
+      console.log('🔍 Direct API Test Result:', data);
+      setDebugInfo(`✅ Direct API Test - Status: ${response.status}, Blogs: ${data.data?.length}`);
+    } catch (error) {
+      console.error('❌ Direct API Test Failed:', error);
+      setDebugInfo(`❌ Direct API Test Failed: ${error.message}`);
+    }
   };
 
   if (loading) {
@@ -106,40 +162,14 @@ const BlogList = () => {
             <div className="loading-spinner"></div>
             <h2>Loading Blog Posts...</h2>
             <p>Please wait while we fetch the latest content</p>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  if (error) {
-    return (
-      <div className="blog-list-page">
-        <div className="container">
-          <div className="page-header">
-            <h1>Our Blog</h1>
-            <p>Discover insights, innovations, and ideas</p>
-          </div>
-          <div className="error-state">
-            <div className="error-icon">
-              <i className="fas fa-exclamation-triangle"></i>
-            </div>
-            <h2>Unable to Load Blogs</h2>
-            <p className="error-message">{error}</p>
-            
-            <div className="error-details">
-              <p><strong>Backend URL:</strong> {process.env.REACT_APP_API_URL || 'https://zmo-backend.onrender.com'}</p>
-              <p><strong>Current Endpoint:</strong> /api/blogs</p>
-              <p><strong>Admin Panel:</strong> {window.location.origin}/admin</p>
-            </div>
-            
-            <div className="error-actions">
-              <button onClick={handleRetry} className="btn btn-primary">
-                <i className="fas fa-redo"></i> Try Again
-              </button>
-              <Link to="/" className="btn btn-outline">
-                <i className="fas fa-home"></i> Go Home
-              </Link>
+            <div className="debug-info" style={{ 
+              background: '#f8f9fa', 
+              padding: '10px', 
+              borderRadius: '4px', 
+              marginTop: '15px',
+              fontSize: '14px'
+            }}>
+              <strong>Debug:</strong> {debugInfo}
             </div>
           </div>
         </div>
@@ -154,6 +184,71 @@ const BlogList = () => {
         <div className="page-header">
           <h1>Our Blog</h1>
           <p>Discover insights, innovations, and ideas from CYBARCSOFT</p>
+          
+          {/* Debug Section - Temporary */}
+          <div style={{ 
+            background: '#fff3cd', 
+            padding: '15px', 
+            margin: '15px 0', 
+            border: '1px solid #ffeaa7',
+            borderRadius: '8px',
+            fontSize: '14px'
+          }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px' }}>
+              <div>
+                <strong>🔍 Debug Information</strong>
+                <div style={{ marginTop: '5px' }}>
+                  <span>Status: {debugInfo}</span>
+                  <span style={{ marginLeft: '15px' }}>Blogs: {blogs.length}</span>
+                  <span style={{ marginLeft: '10px' }}>Filtered: {filteredBlogs.length}</span>
+                </div>
+              </div>
+              <div style={{ display: 'flex', gap: '10px' }}>
+                <button 
+                  onClick={testAPI}
+                  style={{ 
+                    padding: '5px 10px', 
+                    background: '#17a2b8', 
+                    color: 'white', 
+                    border: 'none', 
+                    borderRadius: '4px',
+                    fontSize: '12px',
+                    cursor: 'pointer'
+                  }}
+                >
+                  Test API
+                </button>
+                <button 
+                  onClick={() => console.log('🔍 Current blogs:', blogs)}
+                  style={{ 
+                    padding: '5px 10px', 
+                    background: '#6c757d', 
+                    color: 'white', 
+                    border: 'none', 
+                    borderRadius: '4px',
+                    fontSize: '12px',
+                    cursor: 'pointer'
+                  }}
+                >
+                  Console Log
+                </button>
+                <button 
+                  onClick={handleRetry}
+                  style={{ 
+                    padding: '5px 10px', 
+                    background: '#28a745', 
+                    color: 'white', 
+                    border: 'none', 
+                    borderRadius: '4px',
+                    fontSize: '12px',
+                    cursor: 'pointer'
+                  }}
+                >
+                  Refresh
+                </button>
+              </div>
+            </div>
+          </div>
         </div>
 
         {/* Search and Filter Section */}
@@ -198,6 +293,10 @@ const BlogList = () => {
                       src={blog.featuredImage || blog.image} 
                       alt={blog.title}
                       loading="lazy"
+                      onError={(e) => {
+                        console.warn('Image failed to load:', blog.featuredImage || blog.image);
+                        e.target.style.display = 'none';
+                      }}
                     />
                   ) : (
                     <div className="image-placeholder">
@@ -275,9 +374,9 @@ const BlogList = () => {
               <button onClick={handleClearSearch} className="btn btn-primary">
                 Clear Search
               </button>
-              <Link to="/blogs" className="btn btn-outline">
-                View All Posts
-              </Link>
+              <button onClick={handleRetry} className="btn btn-outline">
+                Refresh Page
+              </button>
             </div>
           </div>
         ) : (
@@ -288,15 +387,34 @@ const BlogList = () => {
             <h3>No Blog Posts Available</h3>
             <p>There are no published blog posts at the moment.</p>
             <p className="subtext">Check back soon for new content or contact the administrator.</p>
+            
+            {/* Enhanced empty state with debugging help */}
+            <div style={{ 
+              background: '#f8d7da', 
+              padding: '15px', 
+              borderRadius: '8px', 
+              margin: '15px 0',
+              textAlign: 'left'
+            }}>
+              <h4 style={{ color: '#721c24', marginBottom: '10px' }}>Troubleshooting Tips:</h4>
+              <ul style={{ color: '#721c24', marginBottom: '0' }}>
+                <li>Check if blogs are marked as "published" in the admin panel</li>
+                <li>Verify the backend API is returning data</li>
+                <li>Check browser console for detailed error messages</li>
+                <li>Try the "Test API" button above to verify backend connection</li>
+              </ul>
+            </div>
+            
             <div className="empty-actions">
+              <button onClick={testAPI} className="btn btn-outline" style={{ marginRight: '10px' }}>
+                <i className="fas fa-bug"></i> Test API
+              </button>
               <Link to="/admin" className="btn btn-outline">
-                <i className="fas fa-cog"></i>
-                Admin Panel
+                <i className="fas fa-cog"></i> Admin Panel
               </Link>
-              <Link to="/" className="btn btn-outline">
-                <i className="fas fa-home"></i>
-                Go Home
-              </Link>
+              <button onClick={handleRetry} className="btn btn-primary" style={{ marginLeft: '10px' }}>
+                <i className="fas fa-redo"></i> Try Again
+              </button>
             </div>
           </div>
         )}

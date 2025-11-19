@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import BlogCard from '../components/BlogCard';
-import './Blog.css'; // Make sure you have this CSS file
+import { publicAPI } from '../services/api'; // Import the new API service
+import './Blog.css';
 
 const Blog = () => {
   const [blogs, setBlogs] = useState([]);
@@ -17,53 +18,39 @@ const Blog = () => {
       setLoading(true);
       setError('');
       
-      // Use environment variable or fallback to correct backend URL
-      const API_BASE = process.env.REACT_APP_API_BASE_URL || 'https://zmo-backend.onrender.com/api';
+      console.log('🔄 Fetching blogs using API service...');
       
-      console.log('🔄 Fetching blogs from:', `${API_BASE}/blogs/simple`);
+      // Use the new publicAPI service
+      const result = await publicAPI.getBlogs();
       
-      const response = await fetch(`${API_BASE}/blogs/simple`, {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json',
-        },
-      });
+      console.log('📝 API Response:', result);
       
-      console.log('📡 Response status:', response.status);
-      
-      if (!response.ok) {
-        // Try alternative endpoint if simple fails
-        if (response.status === 404) {
-          console.log('🔄 Simple endpoint not found, trying main blogs endpoint...');
-          return await fetchMainBlogs();
-        }
-        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-      }
-      
-      const data = await response.json();
-      console.log('📝 API Response:', data);
-      
-      if (data.success) {
-        // Handle different response structures
-        const blogData = data.data || data.blogs || [];
+      if (result.success) {
+        // Handle the response structure from the new API
+        const blogData = result.data || [];
         setBlogs(blogData);
         console.log(`✅ Loaded ${blogData.length} blogs successfully`);
       } else {
-        throw new Error(data.message || 'Failed to load blogs from API');
+        throw new Error(result.message || 'Failed to load blogs from API');
       }
     } catch (err) {
       console.error('❌ Error fetching blogs:', err);
       
-      // Provide user-friendly error messages
+      // Enhanced error handling with specific messages
       let errorMessage = err.message;
       
-      if (err.message.includes('Failed to fetch') || err.message.includes('NetworkError')) {
-        errorMessage = 'Cannot connect to the server. Please check your internet connection and try again.';
+      if (err.message.includes('Network Error') || err.message.includes('Failed to fetch') || err.message.includes('ECONNREFUSED')) {
+        errorMessage = 'Cannot connect to the server. The backend might be starting up or experiencing issues.';
+      } else if (err.message.includes('timeout') || err.message.includes('TIMEOUT')) {
+        errorMessage = 'Request timed out. The server is taking too long to respond.';
+      } else if (err.message.includes('CORS')) {
+        errorMessage = 'Cross-origin request blocked. Please check backend CORS configuration.';
       } else if (err.message.includes('404')) {
-        errorMessage = 'Blog endpoint not found. The server might be updating.';
+        errorMessage = 'Blog endpoint not found. The API route might have changed.';
       } else if (err.message.includes('500')) {
         errorMessage = 'Server error. Please try again later.';
+      } else if (err.message.includes('401') || err.message.includes('403')) {
+        errorMessage = 'Authentication error. Please check your access permissions.';
       }
       
       setError(errorMessage);
@@ -75,45 +62,38 @@ const Blog = () => {
     }
   };
 
-  const fetchMainBlogs = async () => {
-    try {
-      const API_BASE = process.env.REACT_APP_API_BASE_URL || 'https://zmo-backend.onrender.com/api';
-      console.log('🔄 Trying main blogs endpoint:', `${API_BASE}/blogs`);
-      
-      const response = await fetch(`${API_BASE}/blogs`);
-      
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-      }
-      
-      const data = await response.json();
-      
-      if (data.success) {
-        const blogData = data.data || data.blogs || [];
-        setBlogs(blogData);
-        console.log(`✅ Loaded ${blogData.length} blogs from main endpoint`);
-      } else {
-        throw new Error(data.message || 'Failed to load blogs from main endpoint');
-      }
-    } catch (err) {
-      throw new Error(`Alternative endpoint also failed: ${err.message}`);
-    }
-  };
-
   const handleRetry = () => {
+    console.log('🔄 Retrying blog fetch...');
     setRetryCount(prev => prev + 1);
   };
 
   const handleRefresh = () => {
+    console.log('🔃 Refreshing page...');
     window.location.reload();
+  };
+
+  // Test backend connection
+  const testBackendConnection = async () => {
+    try {
+      console.log('🔗 Testing backend connection...');
+      const result = await publicAPI.testConnection();
+      
+      if (result.success) {
+        alert('✅ Backend connection successful!');
+      } else {
+        alert(`❌ Backend connection failed: ${result.message}`);
+      }
+    } catch (err) {
+      alert(`❌ Connection test failed: ${err.message}`);
+    }
   };
 
   // Show connection details for debugging
   const connectionDetails = {
     backendURL: process.env.REACT_APP_API_URL || 'https://zmo-backend.onrender.com',
-    currentEndpoint: '/api/blogs/simple',
-    alternativeEndpoint: '/api/blogs',
-    adminPanel: 'https://zmo-admin.vercel.app'
+    currentEndpoint: '/api/blogs',
+    environment: process.env.NODE_ENV,
+    adminPanel: 'https://zmo-frontend.vercel.app/admin'
   };
 
   if (loading) {
@@ -126,6 +106,9 @@ const Blog = () => {
         <div className="loading-section">
           <div className="loading-spinner"></div>
           <p>Loading blogs...</p>
+          <div className="loading-details">
+            <small>Connecting to: {connectionDetails.backendURL}</small>
+          </div>
         </div>
       </div>
     );
@@ -136,14 +119,34 @@ const Blog = () => {
       <div className="blog-header">
         <h1>ZMO Blog</h1>
         <p>Sharing insights, tutorials, and company updates</p>
+        
+        {/* Connection test button for debugging */}
+        {process.env.NODE_ENV === 'development' && (
+          <button 
+            onClick={testBackendConnection}
+            className="btn-test-connection"
+            style={{
+              background: '#6c757d',
+              color: 'white',
+              border: 'none',
+              padding: '8px 16px',
+              borderRadius: '4px',
+              fontSize: '12px',
+              cursor: 'pointer',
+              marginTop: '10px'
+            }}
+          >
+            🔗 Test Backend Connection
+          </button>
+        )}
       </div>
 
       {error && (
         <div className="error-section">
           <div className="error-icon">⚠️</div>
           <div className="error-content">
-            <h3>Failed to load blogs</h3>
-            <p>{error}</p>
+            <h3>Unable to Load Blogs</h3>
+            <p className="error-message">{error}</p>
             
             <div className="error-actions">
               <button onClick={handleRetry} className="btn-primary">
@@ -154,7 +157,7 @@ const Blog = () => {
               </button>
             </div>
 
-            {/* Connection details for debugging */}
+            {/* Enhanced connection details for debugging */}
             <div className="connection-details">
               <h4>Connection Details:</h4>
               <div className="detail-item">
@@ -164,10 +167,21 @@ const Blog = () => {
                 <strong>Current Endpoint:</strong> {connectionDetails.currentEndpoint}
               </div>
               <div className="detail-item">
-                <strong>Alternative:</strong> {connectionDetails.alternativeEndpoint}
+                <strong>Environment:</strong> {connectionDetails.environment}
               </div>
               <div className="detail-item">
                 <strong>Admin Panel:</strong> {connectionDetails.adminPanel}
+              </div>
+              
+              {/* Troubleshooting tips */}
+              <div className="troubleshooting-tips">
+                <h5>Troubleshooting Tips:</h5>
+                <ul>
+                  <li>Check if the backend server is running</li>
+                  <li>Verify CORS configuration on the backend</li>
+                  <li>Check network connectivity</li>
+                  <li>Wait a few minutes if the backend was recently deployed</li>
+                </ul>
               </div>
             </div>
           </div>
@@ -194,10 +208,15 @@ const Blog = () => {
               <div className="blog-grid">
                 {blogs.map(blog => (
                   <BlogCard 
-                    key={blog._id || blog.id} 
+                    key={blog._id} 
                     blog={blog} 
                   />
                 ))}
+              </div>
+              
+              {/* Success message */}
+              <div className="success-message">
+                <small>✅ Successfully loaded blogs from backend</small>
               </div>
             </>
           )}

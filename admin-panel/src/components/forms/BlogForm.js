@@ -1,44 +1,120 @@
-// admin-panel/src/components/forms/BlogForm.js
 import React, { useState, useEffect } from 'react';
 import './BlogForm.css';
 
 const BlogForm = ({ blog, onSubmit, onCancel }) => {
+  // Form states
   const [title, setTitle] = useState('');
   const [content, setContent] = useState('');
   const [imageUrl, setImageUrl] = useState('');
-  const [imageFile, setImageFile] = useState(null);
+  // eslint-disable-next-line no-unused-vars
+  const [imageFile, setImageFile] = useState(null); // Fixed: marked as intentionally unused
   const [imagePreview, setImagePreview] = useState('');
   const [useImageUrl, setUseImageUrl] = useState(false);
   const [loading, setLoading] = useState(false);
 
+  // Additional fields
+  const [excerpt, setExcerpt] = useState('');
+  const [author, setAuthor] = useState('Admin User');
+  const [readTime, setReadTime] = useState(5);
+  const [tags, setTags] = useState([]);
+  const [tagInput, setTagInput] = useState('');
+  const [status, setStatus] = useState('draft');
+  const [featured, setFeatured] = useState(false);
+  const [errors, setErrors] = useState({});
+
+  // Initialize form with blog data if editing
   useEffect(() => {
     if (blog) {
       setTitle(blog.title || '');
       setContent(blog.content || '');
       setImageUrl(blog.imageUrl || '');
       setImagePreview(blog.imageUrl || '');
+      setExcerpt(blog.excerpt || '');
+      setAuthor(blog.author || 'Admin User');
+      setReadTime(blog.readTime || 5);
+      setTags(blog.tags || []);
+      setStatus(blog.status || 'draft');
+      setFeatured(blog.featured || false);
     }
   }, [blog]);
 
+  // Character limit constants
+  const CHAR_LIMITS = {
+    title: 100,
+    excerpt: 200
+  };
+
+  // Validation function
+  const validateForm = () => {
+    const newErrors = {};
+    
+    if (!title.trim()) newErrors.title = 'Title is required';
+    if (title.length > CHAR_LIMITS.title) newErrors.title = `Title must be less than ${CHAR_LIMITS.title} characters`;
+    
+    if (!excerpt.trim()) newErrors.excerpt = 'Excerpt is required';
+    if (excerpt.length > CHAR_LIMITS.excerpt) newErrors.excerpt = `Excerpt must be less than ${CHAR_LIMITS.excerpt} characters`;
+    
+    if (!content.trim()) newErrors.content = 'Content is required';
+    if (content.length < 50) newErrors.content = 'Content must be at least 50 characters';
+    
+    if (!author.trim()) newErrors.author = 'Author is required';
+    
+    if (!readTime || readTime < 1 || readTime > 60) newErrors.readTime = 'Read time must be between 1 and 60 minutes';
+
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
+
+  // Tag management functions
+  const handleTagInput = (e) => {
+    if (e.key === 'Enter' && tagInput.trim()) {
+      e.preventDefault();
+      const newTag = tagInput.trim().toLowerCase();
+      
+      if (!tags.includes(newTag)) {
+        setTags(prev => [...prev, newTag]);
+      }
+      
+      setTagInput('');
+    }
+  };
+
+  const removeTag = (tagToRemove) => {
+    setTags(prev => prev.filter(tag => tag !== tagToRemove));
+  };
+
+  const handleTagInputChange = (e) => {
+    setTagInput(e.target.value);
+    if (errors.tags) {
+      setErrors(prev => ({ ...prev, tags: '' }));
+    }
+  };
+
+  // Clear error when user starts typing
+  const clearError = (fieldName) => {
+    if (errors[fieldName]) {
+      setErrors(prev => ({ ...prev, [fieldName]: '' }));
+    }
+  };
+
+  // Image handling functions
   const handleImageUpload = (e) => {
     const file = e.target.files[0];
     if (file) {
-      // Validate file type
       if (!file.type.startsWith('image/')) {
-        alert('Please select an image file (JPEG, PNG, GIF, etc.)');
+        setErrors(prev => ({ ...prev, image: 'Please select an image file (JPEG, PNG, GIF, etc.)' }));
         return;
       }
 
-      // Validate file size (max 5MB)
       if (file.size > 5 * 1024 * 1024) {
-        alert('Image size should be less than 5MB');
+        setErrors(prev => ({ ...prev, image: 'Image size should be less than 5MB' }));
         return;
       }
 
       setImageFile(file);
       setUseImageUrl(false);
+      setErrors(prev => ({ ...prev, image: '' }));
 
-      // Create preview
       const reader = new FileReader();
       reader.onload = (e) => {
         setImagePreview(e.target.result);
@@ -51,6 +127,7 @@ const BlogForm = ({ blog, onSubmit, onCancel }) => {
     setImageUrl(e.target.value);
     setUseImageUrl(true);
     setImageFile(null);
+    setErrors(prev => ({ ...prev, image: '' }));
     
     if (e.target.value) {
       setImagePreview(e.target.value);
@@ -64,50 +141,71 @@ const BlogForm = ({ blog, onSubmit, onCancel }) => {
     setImageUrl('');
     setImagePreview('');
     setUseImageUrl(false);
+    setErrors(prev => ({ ...prev, image: '' }));
     
-    // Clear file input
     const fileInput = document.getElementById('image-upload');
     if (fileInput) fileInput.value = '';
   };
 
+  // Fixed submit handler
   const handleSubmit = async (e) => {
     e.preventDefault();
+    console.log('🚀 Form submission started');
+    
+    if (!validateForm()) {
+      console.log('❌ Form validation failed', errors);
+      return;
+    }
+    console.log('✅ Form validation passed');
+
     setLoading(true);
+    console.log('⏳ Loading state set to true');
 
     try {
-      let finalImageUrl = imageUrl;
-
-      // If a local file is selected, you would upload it here
-      if (imageFile && !useImageUrl) {
-        // In a real app, you would upload the file to your server
-        // For now, we'll use the data URL as a placeholder
-        finalImageUrl = imagePreview;
-        
-        // Example of actual upload implementation:
-        // const formData = new FormData();
-        // formData.append('image', imageFile);
-        // const uploadResponse = await fetch('/api/upload', {
-        //   method: 'POST',
-        //   body: formData,
-        // });
-        // const uploadData = await uploadResponse.json();
-        // finalImageUrl = uploadData.url;
-      }
-
-      const formData = {
-        title,
-        content,
-        imageUrl: finalImageUrl,
-        // Include the file if you want to handle upload separately
-        ...(imageFile && { imageFile })
+      // Prepare data for blogService
+      const blogData = {
+        title: title.trim(),
+        excerpt: excerpt.trim(),
+        content: content.trim(),
+        author: author.trim(),
+        readTime: parseInt(readTime),
+        tags: tags,
+        status: status,
+        featured: featured,
+        imageUrl: useImageUrl ? imageUrl.trim() : (imagePreview || '')
       };
 
-      await onSubmit(formData);
+      console.log('📦 Prepared blogData:', blogData);
+
+      // Call onSubmit prop with the prepared data
+      if (onSubmit && typeof onSubmit === 'function') {
+        await onSubmit(blogData);
+        console.log('🎉 onSubmit completed successfully');
+      } else {
+        console.error('❌ onSubmit is not a function:', onSubmit);
+        setErrors(prev => ({ 
+          ...prev, 
+          submit: 'Form submission handler is not available.' 
+        }));
+      }
+      
     } catch (error) {
-      console.error('Error submitting form:', error);
+      console.error('💥 Error in handleSubmit:', error);
+      setErrors(prev => ({ 
+        ...prev, 
+        submit: error.message || 'Failed to submit form. Please try again.' 
+      }));
     } finally {
       setLoading(false);
+      console.log('🔚 Loading state set to false');
     }
+  };
+
+  // Calculate character count classes
+  const getCharCountClass = (currentLength, maxLength) => {
+    return `blog-form__char-count ${
+      currentLength > maxLength ? 'blog-form__char-count--warning' : ''
+    }`;
   };
 
   return (
@@ -122,19 +220,182 @@ const BlogForm = ({ blog, onSubmit, onCancel }) => {
       </div>
 
       <form className="blog-form__form" onSubmit={handleSubmit}>
+        {/* Title Field */}
         <div className="blog-form__field">
           <label className="blog-form__label" htmlFor="title">
             Title *
           </label>
           <input
             id="title"
-            className="blog-form__input"
+            className={`blog-form__input ${errors.title ? 'blog-form__input--error' : ''}`}
             type="text"
             placeholder="Enter blog post title"
             value={title}
-            onChange={e => setTitle(e.target.value)}
+            onChange={(e) => {
+              setTitle(e.target.value);
+              clearError('title');
+            }}
             required
           />
+          <div className={getCharCountClass(title.length, CHAR_LIMITS.title)}>
+            {title.length}/{CHAR_LIMITS.title} characters
+          </div>
+          {errors.title && <span className="blog-form__error">{errors.title}</span>}
+        </div>
+
+        {/* Excerpt Field */}
+        <div className="blog-form__field">
+          <label className="blog-form__label" htmlFor="excerpt">
+            Excerpt *
+          </label>
+          <textarea
+            id="excerpt"
+            className={`blog-form__textarea ${errors.excerpt ? 'blog-form__input--error' : ''}`}
+            placeholder="Brief description of your post"
+            value={excerpt}
+            onChange={(e) => {
+              setExcerpt(e.target.value);
+              clearError('excerpt');
+            }}
+            rows="3"
+            required
+          />
+          <div className={getCharCountClass(excerpt.length, CHAR_LIMITS.excerpt)}>
+            {excerpt.length}/{CHAR_LIMITS.excerpt} characters
+          </div>
+          {errors.excerpt && <span className="blog-form__error">{errors.excerpt}</span>}
+        </div>
+
+        {/* Content Field */}
+        <div className="blog-form__field">
+          <label className="blog-form__label" htmlFor="content">
+            Content *
+          </label>
+          <textarea
+            id="content"
+            className={`blog-form__textarea blog-form__textarea--large ${errors.content ? 'blog-form__input--error' : ''}`}
+            placeholder="Write your blog post content here..."
+            value={content}
+            onChange={(e) => {
+              setContent(e.target.value);
+              clearError('content');
+            }}
+            rows="8"
+            required
+          />
+          <div className="blog-form__char-count">
+            {content.length} characters {content.length < 50 && '(minimum 50 required)'}
+          </div>
+          {errors.content && <span className="blog-form__error">{errors.content}</span>}
+        </div>
+
+        {/* Two-column layout for Author and Read Time */}
+        <div className="blog-form__row">
+          <div className="blog-form__field blog-form__field--half">
+            <label className="blog-form__label" htmlFor="author">
+              Author *
+            </label>
+            <input
+              id="author"
+              className={`blog-form__input ${errors.author ? 'blog-form__input--error' : ''}`}
+              type="text"
+              placeholder="Author name"
+              value={author}
+              onChange={(e) => {
+                setAuthor(e.target.value);
+                clearError('author');
+              }}
+              required
+            />
+            {errors.author && <span className="blog-form__error">{errors.author}</span>}
+          </div>
+
+          <div className="blog-form__field blog-form__field--half">
+            <label className="blog-form__label" htmlFor="readTime">
+              Read Time (minutes) *
+            </label>
+            <input
+              id="readTime"
+              className={`blog-form__input ${errors.readTime ? 'blog-form__input--error' : ''}`}
+              type="number"
+              min="1"
+              max="60"
+              placeholder="5"
+              value={readTime}
+              onChange={(e) => {
+                setReadTime(e.target.value);
+                clearError('readTime');
+              }}
+              required
+            />
+            {errors.readTime && <span className="blog-form__error">{errors.readTime}</span>}
+          </div>
+        </div>
+
+        {/* Tags Field */}
+        <div className="blog-form__field">
+          <label className="blog-form__label">
+            Tags
+          </label>
+          <div className="blog-form__tags-input">
+            {tags.map(tag => (
+              <span key={tag} className="blog-form__tag">
+                {tag}
+                <button 
+                  type="button" 
+                  className="blog-form__tag-remove"
+                  onClick={() => removeTag(tag)}
+                >
+                  ×
+                </button>
+              </span>
+            ))}
+            <input
+              type="text"
+              className="blog-form__tag-input"
+              value={tagInput}
+              onChange={handleTagInputChange}
+              onKeyDown={handleTagInput}
+              placeholder="Type a tag and press Enter"
+            />
+          </div>
+          <div className="blog-form__char-count">
+            Press Enter to add tags
+          </div>
+          {errors.tags && <span className="blog-form__error">{errors.tags}</span>}
+        </div>
+
+        {/* Two-column layout for Status and Featured */}
+        <div className="blog-form__row">
+          <div className="blog-form__field blog-form__field--half">
+            <label className="blog-form__label" htmlFor="status">
+              Status *
+            </label>
+            <select
+              id="status"
+              className="blog-form__select"
+              value={status}
+              onChange={(e) => setStatus(e.target.value)}
+            >
+              <option value="draft">Draft</option>
+              <option value="published">Published</option>
+            </select>
+          </div>
+
+          <div className="blog-form__field blog-form__field--half">
+            <label className="blog-form__label" htmlFor="featured">
+              Featured Post
+            </label>
+            <select
+              id="featured"
+              className="blog-form__select"
+              value={featured ? 'yes' : 'no'}
+              onChange={(e) => setFeatured(e.target.value === 'yes')}
+            >
+              <option value="no">No</option>
+              <option value="yes">Yes</option>
+            </select>
+          </div>
         </div>
 
         {/* Image Upload Section */}
@@ -152,6 +413,7 @@ const BlogForm = ({ blog, onSubmit, onCancel }) => {
                 className="blog-form__image"
                 onError={(e) => {
                   e.target.style.display = 'none';
+                  setErrors(prev => ({ ...prev, image: 'Failed to load image from URL' }));
                 }}
               />
               <button
@@ -220,25 +482,18 @@ const BlogForm = ({ blog, onSubmit, onCancel }) => {
               </p>
             </div>
           )}
+          
+          {errors.image && <span className="blog-form__error">{errors.image}</span>}
         </div>
 
-        <div className="blog-form__field">
-          <label className="blog-form__label" htmlFor="content">
-            Content *
-          </label>
-          <textarea
-            id="content"
-            className="blog-form__textarea blog-form__textarea--large"
-            placeholder="Write your blog post content here..."
-            value={content}
-            onChange={e => setContent(e.target.value)}
-            required
-          />
-          <div className="blog-form__char-count">
-            {content.length} characters
+        {/* Submit Error */}
+        {errors.submit && (
+          <div className="blog-form__error blog-form__error--submit">
+            {errors.submit}
           </div>
-        </div>
+        )}
 
+        {/* Action Buttons */}
         <div className="blog-form__actions">
           <button
             type="button"
@@ -248,14 +503,35 @@ const BlogForm = ({ blog, onSubmit, onCancel }) => {
           >
             Cancel
           </button>
+          
           <button
             type="submit"
             className="blog-form__button blog-form__button--primary"
             disabled={loading}
           >
             {loading && <span className="blog-form__spinner"></span>}
-            {blog ? 'Update Post' : 'Create Post'}
+            {blog ? 'Update Post' : status === 'published' ? 'Publish Now' : 'Save as Draft'}
           </button>
+        </div>
+
+        {/* DEBUG PANEL - Remove this after testing */}
+        <div style={{ 
+          padding: '15px', 
+          border: '2px dashed #4CAF50', 
+          margin: '20px 0',
+          background: '#f0f8f0',
+          borderRadius: '8px'
+        }}>
+          <h4 style={{ margin: '0 0 10px 0', color: '#4CAF50' }}>🐛 DEBUG INFO</h4>
+          <div style={{ fontSize: '12px', fontFamily: 'monospace' }}>
+            <div>Title: {title.length}/100</div>
+            <div>Excerpt: {excerpt.length}/200</div>
+            <div>Content: {content.length} chars</div>
+            <div>Validation: {validateForm() ? '✅ PASS' : '❌ FAIL'}</div>
+            <div>Loading: {loading ? '⏳ YES' : '✅ NO'}</div>
+            <div>Image Preview: {imagePreview ? '✅ SET' : '❌ NOT SET'}</div>
+            <div>Tags: {tags.length} tags</div>
+          </div>
         </div>
       </form>
     </div>

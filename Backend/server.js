@@ -1,4 +1,4 @@
-// backend/server.js - COMPLETE FIXED VERSION WITH MONGODB CONNECTION
+// backend/server.js - COMPLETE FIXED VERSION WITH MONGODB BLOG ROUTES
 const express = require('express');
 const cors = require('cors');
 const mongoose = require('mongoose');
@@ -356,67 +356,25 @@ app.get('/api/debug/routes', (req, res) => {
   });
 });
 
-// ✅ FIXED: Blog routes
-app.get('/api/blogs', (req, res) => {
-  console.log('📝 BLOG ROUTE: Fetching all blogs from:', req.headers.origin);
-  res.json({
-    success: true,
-    data: [
-      {
-        _id: '1',
-        title: 'Getting Started with React on Render',
-        excerpt: 'Learn how to deploy React applications on Render platform.',
-        content: 'This is a full blog post content about deploying React apps on Render...',
-        author: 'Admin User',
-        published: true,
-        tags: ['react', 'deployment', 'tutorial'],
-        readTime: 5,
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString()
-      },
-      {
-        _id: '2',
-        title: 'Building REST APIs with Node.js',
-        excerpt: 'Complete guide to building RESTful APIs with Express.js',
-        content: 'Learn how to build scalable REST APIs using Node.js and Express...',
-        author: 'Admin User',
-        published: true,
-        tags: ['nodejs', 'express', 'api'],
-        readTime: 8,
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString()
-      }
-    ],
-    count: 2,
-    message: '✅ Blog API is working!',
-    database: getDBState(mongoose.connection.readyState),
-    timestamp: new Date().toISOString(),
-    requestId: req.requestId
-  });
-});
+// ==========================================
+// 📝 MONGODB BLOG ROUTES
+// ==========================================
 
-// ✅ FIXED: Single blog route (defined AFTER the /api/blogs route)
-app.get('/api/blogs/:id', (req, res) => {
-  console.log('📖 SINGLE BLOG ROUTE: Fetching blog:', req.params.id);
-  res.json({
-    success: true,
-    data: {
-      _id: req.params.id,
-      title: 'Blog Post ' + req.params.id,
-      content: 'This is the full content of blog post ' + req.params.id + '. This content is served from the backend API.',
-      excerpt: 'Excerpt for blog post ' + req.params.id,
-      author: 'Admin User',
-      published: true,
-      tags: ['sample', 'blog'],
-      readTime: 5,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString()
-    },
-    message: '✅ Single blog route working',
-    database: getDBState(mongoose.connection.readyState),
-    requestId: req.requestId
-  });
-});
+// Import blog routes
+const blogRoutes = require('./routes/blogRoutes');
+app.use('/api/blogs', blogRoutes);
+
+console.log('📝 Blog Routes Registered:');
+console.log('   GET    /api/blogs');
+console.log('   GET    /api/blogs/stats');
+console.log('   GET    /api/blogs/:id');
+console.log('   POST   /api/blogs');
+console.log('   PUT    /api/blogs/:id');
+console.log('   DELETE /api/blogs/:id');
+
+// ==========================================
+// 🎯 PROJECT ROUTES (KEEP EXISTING)
+// ==========================================
 
 // ✅ FIXED: Project routes
 app.get('/api/projects', (req, res) => {

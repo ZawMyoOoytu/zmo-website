@@ -1,0 +1,97 @@
+/* admin-panel/src/pages/Blogs/BlogList.css */
+.admin-blog-list {
+  padding: 20px 0;
+}
+
+.admin-page-header {
+  margin-bottom: 30px;
+}
+
+.admin-page-header .header-content {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 15px;
+}
+
+.admin-page-header h1 {
+  color: #343a40;
+  margin-bottom: 5px;
+}
+
+.admin-page-header p {
+  color: #6c757d;
+  margin-bottom: 0;
+}
+
+.header-actions {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+
+.search-box-admin {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.search-box-admin .fas.fa-search {
+  position: absolute;
+  left: 12px;
+  color: #6c757d;
+  z-index: 3;
+}
+
+.search-box-admin .form-control {
+  padding-left: 40px;
+}
+
+.debug-info {
+  font-size: 14px;
+  background: #f8f9fa;
+  padding: 15px;
+  border-radius: 8px;
+  margin-bottom: 20px;
+  border: 1px solid #dee2e6;
+}
+
+/* Table styles */
+.table th {
+  border-top: none;
+  font-weight: 600;
+  color: #495057;
+  background-color: #f8f9fa;
+}
+
+.table td {
+  vertical-align: middle;
+}
+
+/* Badge styles */
+.badge {
+  font-size: 0.75em;
+}
+
+/* Button group spacing */
+.btn-group-sm > .btn {
+  padding: 0.25rem 0.5rem;
+}
+
+/* Responsive design */
+@media (max-width: 768px) {
+  .admin-page-header .header-content {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  
+  .header-actions {
+    width: 100%;
+    justify-content: flex-end;
+  }
+  
+  .search-box-admin {
+    margin-bottom: 15px;
+  }
+}

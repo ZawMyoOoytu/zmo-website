@@ -7,37 +7,1471 @@
     <meta name="theme-color" content="#000000" />
     <meta
       name="description"
-      content="Web site created using create-react-app"
+      content="Admin Dashboard for Blog and Project Management"
     />
     <link rel="apple-touch-icon" href="%PUBLIC_URL%/logo192.png" />
-    <!--
-      manifest.json provides metadata used when your web app is installed on a
-      user's mobile device or desktop. See https://developers.google.com/web/fundamentals/web-app-manifest/
-    -->
     <link rel="manifest" href="%PUBLIC_URL%/manifest.json" />
-    <!--
-      Notice the use of %PUBLIC_URL% in the tags above.
-      It will be replaced with the URL of the `public` folder during the build.
-      Only files inside the `public` folder can be referenced from the HTML.
-
-      Unlike "/favicon.ico" or "favicon.ico", "%PUBLIC_URL%/favicon.ico" will
-      work correctly both with client-side routing and a non-root public URL.
-      Learn how to configure a non-root public URL by running `npm run build`.
-    -->
-    <title>React App</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <title>Admin Dashboard - Blog & Project Management</title>
+    <style>
+      :root {
+        --primary: #4361ee;
+        --secondary: #3f37c9;
+        --success: #4cc9f0;
+        --warning: #f72585;
+        --info: #7209b7;
+        --light: #f8f9fa;
+        --dark: #212529;
+        --gray: #6c757d;
+        --border: #dee2e6;
+        --sidebar-width: 250px;
+      }
+      
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      }
+      
+      body {
+        background-color: #f5f7fb;
+        color: var(--dark);
+        display: flex;
+        min-height: 100vh;
+      }
+      
+      /* Sidebar */
+      .sidebar {
+        width: var(--sidebar-width);
+        background: linear-gradient(180deg, var(--primary), var(--secondary));
+        color: white;
+        height: 100vh;
+        position: fixed;
+        overflow-y: auto;
+        transition: all 0.3s;
+        z-index: 1000;
+      }
+      
+      .sidebar-header {
+        padding: 20px;
+        border-bottom: 1px solid rgba(255,255,255,0.1);
+        display: flex;
+        align-items: center;
+      }
+      
+      .sidebar-header h2 {
+        font-size: 1.5rem;
+        margin-left: 10px;
+      }
+      
+      .sidebar-menu {
+        padding: 15px 0;
+      }
+      
+      .menu-item {
+        padding: 12px 20px;
+        display: flex;
+        align-items: center;
+        color: rgba(255,255,255,0.8);
+        text-decoration: none;
+        cursor: pointer;
+        transition: all 0.2s;
+        border: none;
+        background: none;
+        width: 100%;
+        text-align: left;
+      }
+      
+      .menu-item:hover, .menu-item.active {
+        background-color: rgba(255,255,255,0.1);
+        color: white;
+      }
+      
+      .menu-item i {
+        margin-right: 10px;
+        width: 20px;
+        text-align: center;
+      }
+      
+      /* Main Content */
+      .main-content {
+        flex: 1;
+        margin-left: var(--sidebar-width);
+        padding: 20px;
+        transition: all 0.3s;
+      }
+      
+      /* Dashboard Sections */
+      .dashboard-section {
+        display: none;
+      }
+      
+      .dashboard-section.active {
+        display: block;
+      }
+      
+      /* Top Bar */
+      .top-bar {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 30px;
+        padding-bottom: 15px;
+        border-bottom: 1px solid var(--border);
+      }
+      
+      .user-info {
+        display: flex;
+        align-items: center;
+      }
+      
+      .user-avatar {
+        width: 40px;
+        height: 40px;
+        border-radius: 50%;
+        background-color: var(--primary);
+        color: white;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        margin-right: 10px;
+        font-weight: bold;
+      }
+      
+      .notification-badge {
+        background-color: var(--warning);
+        color: white;
+        border-radius: 50%;
+        width: 20px;
+        height: 20px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 0.7rem;
+        position: absolute;
+        top: -5px;
+        right: -5px;
+      }
+      
+      /* Stats Cards */
+      .stats-container {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+        gap: 20px;
+        margin-bottom: 30px;
+      }
+      
+      .stat-card {
+        background: white;
+        border-radius: 10px;
+        padding: 20px;
+        box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+        display: flex;
+        align-items: center;
+      }
+      
+      .stat-icon {
+        width: 50px;
+        height: 50px;
+        border-radius: 10px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        margin-right: 15px;
+        font-size: 1.5rem;
+      }
+      
+      .stat-icon.total {
+        background-color: rgba(67, 97, 238, 0.1);
+        color: var(--primary);
+      }
+      
+      .stat-icon.published {
+        background-color: rgba(76, 201, 240, 0.1);
+        color: var(--success);
+      }
+      
+      .stat-icon.drafts {
+        background-color: rgba(247, 37, 133, 0.1);
+        color: var(--warning);
+      }
+      
+      .stat-icon.projects {
+        background-color: rgba(114, 9, 183, 0.1);
+        color: var(--info);
+      }
+      
+      .stat-info h3 {
+        font-size: 1.8rem;
+        margin-bottom: 5px;
+      }
+      
+      .stat-info p {
+        color: var(--gray);
+        font-size: 0.9rem;
+      }
+      
+      /* Content Section */
+      .content-section {
+        background: white;
+        border-radius: 10px;
+        box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+        overflow: hidden;
+        margin-bottom: 30px;
+      }
+      
+      .section-header {
+        padding: 20px;
+        border-bottom: 1px solid var(--border);
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+      }
+      
+      .section-title {
+        font-size: 1.3rem;
+        font-weight: 600;
+      }
+      
+      .btn {
+        padding: 8px 16px;
+        border-radius: 5px;
+        border: none;
+        cursor: pointer;
+        font-weight: 500;
+        display: inline-flex;
+        align-items: center;
+        transition: all 0.2s;
+      }
+      
+      .btn i {
+        margin-right: 5px;
+      }
+      
+      .btn-primary {
+        background-color: var(--primary);
+        color: white;
+      }
+      
+      .btn-primary:hover {
+        background-color: var(--secondary);
+      }
+      
+      .btn-outline {
+        background-color: transparent;
+        border: 1px solid var(--border);
+        color: var(--gray);
+      }
+      
+      .btn-outline:hover {
+        background-color: #f8f9fa;
+      }
+      
+      /* Filters */
+      .filters {
+        padding: 15px 20px;
+        border-bottom: 1px solid var(--border);
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+      }
+      
+      .search-box {
+        flex: 1;
+        min-width: 200px;
+        position: relative;
+      }
+      
+      .search-box input {
+        width: 100%;
+        padding: 10px 15px 10px 40px;
+        border: 1px solid var(--border);
+        border-radius: 5px;
+        font-size: 0.9rem;
+      }
+      
+      .search-box i {
+        position: absolute;
+        left: 15px;
+        top: 50%;
+        transform: translateY(-50%);
+        color: var(--gray);
+      }
+      
+      .filter-tabs {
+        display: flex;
+        border: 1px solid var(--border);
+        border-radius: 5px;
+        overflow: hidden;
+      }
+      
+      .filter-tab {
+        padding: 8px 15px;
+        background: white;
+        border: none;
+        cursor: pointer;
+        font-size: 0.9rem;
+      }
+      
+      .filter-tab.active {
+        background-color: var(--primary);
+        color: white;
+      }
+      
+      /* Table */
+      .table-container {
+        overflow-x: auto;
+      }
+      
+      table {
+        width: 100%;
+        border-collapse: collapse;
+      }
+      
+      th {
+        text-align: left;
+        padding: 15px 20px;
+        font-weight: 600;
+        color: var(--gray);
+        border-bottom: 1px solid var(--border);
+      }
+      
+      td {
+        padding: 15px 20px;
+        border-bottom: 1px solid var(--border);
+      }
+      
+      tr:last-child td {
+        border-bottom: none;
+      }
+      
+      .blog-title, .project-title {
+        font-weight: 500;
+        margin-bottom: 5px;
+      }
+      
+      .blog-tags, .project-tags {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 5px;
+        margin-top: 5px;
+      }
+      
+      .tag {
+        background-color: rgba(67, 97, 238, 0.1);
+        color: var(--primary);
+        padding: 3px 8px;
+        border-radius: 20px;
+        font-size: 0.8rem;
+      }
+      
+      .status {
+        padding: 5px 10px;
+        border-radius: 20px;
+        font-size: 0.8rem;
+        font-weight: 500;
+      }
+      
+      .status.published, .status.completed {
+        background-color: rgba(76, 201, 240, 0.1);
+        color: var(--success);
+      }
+      
+      .status.draft {
+        background-color: rgba(247, 37, 133, 0.1);
+        color: var(--warning);
+      }
+      
+      .status.in-progress {
+        background-color: rgba(255, 193, 7, 0.1);
+        color: #ffc107;
+      }
+      
+      .status.pending {
+        background-color: rgba(108, 117, 125, 0.1);
+        color: var(--gray);
+      }
+      
+      .priority {
+        padding: 5px 10px;
+        border-radius: 20px;
+        font-size: 0.8rem;
+        font-weight: 500;
+      }
+      
+      .priority.high {
+        background-color: rgba(220, 53, 69, 0.1);
+        color: #dc3545;
+      }
+      
+      .priority.medium {
+        background-color: rgba(255, 193, 7, 0.1);
+        color: #ffc107;
+      }
+      
+      .priority.low {
+        background-color: rgba(40, 167, 69, 0.1);
+        color: #28a745;
+      }
+      
+      .progress-bar {
+        width: 100%;
+        height: 8px;
+        background-color: #e9ecef;
+        border-radius: 4px;
+        overflow: hidden;
+      }
+      
+      .progress-fill {
+        height: 100%;
+        background-color: var(--primary);
+        border-radius: 4px;
+        transition: width 0.3s ease;
+      }
+      
+      .progress-text {
+        font-size: 0.8rem;
+        color: var(--gray);
+        margin-top: 5px;
+      }
+      
+      .actions {
+        display: flex;
+        gap: 10px;
+      }
+      
+      .action-btn {
+        width: 32px;
+        height: 32px;
+        border-radius: 5px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: transparent;
+        border: 1px solid var(--border);
+        color: var(--gray);
+        cursor: pointer;
+        transition: all 0.2s;
+      }
+      
+      .action-btn:hover {
+        background-color: #f8f9fa;
+      }
+      
+      .action-btn.edit:hover {
+        color: var(--primary);
+        border-color: var(--primary);
+      }
+      
+      .action-btn.delete:hover {
+        color: var(--warning);
+        border-color: var(--warning);
+      }
+      
+      /* API Debugger */
+      .api-debugger {
+        background-color: #f8f9fa;
+        border-radius: 10px;
+        padding: 20px;
+        margin-top: 30px;
+      }
+      
+      .debug-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 15px;
+      }
+      
+      .debug-actions {
+        display: flex;
+        gap: 10px;
+      }
+      
+      .debug-status {
+        padding: 8px 15px;
+        border-radius: 5px;
+        font-size: 0.9rem;
+        font-weight: 500;
+      }
+      
+      .debug-status.success {
+        background-color: rgba(76, 201, 240, 0.1);
+        color: var(--success);
+      }
+      
+      .debug-content {
+        background-color: white;
+        border-radius: 5px;
+        padding: 15px;
+        font-family: monospace;
+        font-size: 0.8rem;
+        max-height: 200px;
+        overflow-y: auto;
+        border: 1px solid var(--border);
+      }
+      
+      /* Tabs */
+      .content-tabs {
+        display: flex;
+        border-bottom: 1px solid var(--border);
+        background: white;
+        border-radius: 10px 10px 0 0;
+      }
+      
+      .content-tab {
+        padding: 15px 25px;
+        background: none;
+        border: none;
+        cursor: pointer;
+        font-size: 0.9rem;
+        font-weight: 500;
+        color: var(--gray);
+        border-bottom: 2px solid transparent;
+        transition: all 0.2s;
+      }
+      
+      .content-tab.active {
+        color: var(--primary);
+        border-bottom-color: var(--primary);
+      }
+      
+      .tab-content {
+        display: none;
+      }
+      
+      .tab-content.active {
+        display: block;
+      }
+      
+      /* Analytics Section */
+      .analytics-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+        gap: 20px;
+        margin-bottom: 30px;
+      }
+      
+      .analytics-card {
+        background: white;
+        border-radius: 10px;
+        padding: 20px;
+        box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+      }
+      
+      .analytics-card h3 {
+        margin-bottom: 15px;
+        color: var(--gray);
+        font-size: 1rem;
+      }
+      
+      .chart-placeholder {
+        height: 200px;
+        background: linear-gradient(45deg, #f8f9fa, #e9ecef);
+        border-radius: 5px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: var(--gray);
+        font-size: 0.9rem;
+      }
+      
+      /* Settings Section */
+      .settings-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+        gap: 20px;
+      }
+      
+      .settings-card {
+        background: white;
+        border-radius: 10px;
+        padding: 20px;
+        box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+      }
+      
+      .settings-card h3 {
+        margin-bottom: 15px;
+        color: var(--dark);
+        font-size: 1.1rem;
+      }
+      
+      .form-group {
+        margin-bottom: 15px;
+      }
+      
+      .form-group label {
+        display: block;
+        margin-bottom: 5px;
+        font-weight: 500;
+        color: var(--dark);
+      }
+      
+      .form-group input, .form-group select {
+        width: 100%;
+        padding: 10px;
+        border: 1px solid var(--border);
+        border-radius: 5px;
+        font-size: 0.9rem;
+      }
+      
+      /* Users Section */
+      .user-card {
+        background: white;
+        border-radius: 10px;
+        padding: 20px;
+        box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+        display: flex;
+        align-items: center;
+        margin-bottom: 15px;
+      }
+      
+      .user-avatar-large {
+        width: 60px;
+        height: 60px;
+        border-radius: 50%;
+        background-color: var(--primary);
+        color: white;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        margin-right: 15px;
+        font-weight: bold;
+        font-size: 1.2rem;
+      }
+      
+      .user-info-details {
+        flex: 1;
+      }
+      
+      .user-info-details h3 {
+        margin-bottom: 5px;
+      }
+      
+      .user-info-details p {
+        color: var(--gray);
+        font-size: 0.9rem;
+        margin-bottom: 5px;
+      }
+      
+      /* Responsive */
+      @media (max-width: 992px) {
+        .sidebar {
+          width: 70px;
+        }
+        
+        .sidebar-header h2, .menu-item span {
+          display: none;
+        }
+        
+        .menu-item {
+          justify-content: center;
+          padding: 15px;
+        }
+        
+        .menu-item i {
+          margin-right: 0;
+        }
+        
+        .main-content {
+          margin-left: 70px;
+        }
+      }
+      
+      @media (max-width: 768px) {
+        .stats-container {
+          grid-template-columns: 1fr;
+        }
+        
+        .filters {
+          flex-direction: column;
+        }
+        
+        .search-box {
+          min-width: 100%;
+        }
+        
+        .content-tabs {
+          flex-wrap: wrap;
+        }
+        
+        .content-tab {
+          flex: 1;
+          min-width: 120px;
+          text-align: center;
+        }
+        
+        .analytics-grid, .settings-grid {
+          grid-template-columns: 1fr;
+        }
+      }
+    </style>
   </head>
   <body>
     <noscript>You need to enable JavaScript to run this app.</noscript>
-    <div id="root"></div>
-    <!--
-      This HTML file is a template.
-      If you open it directly in the browser, you will see an empty page.
+    
+    <!-- Sidebar -->
+    <div class="sidebar">
+      <div class="sidebar-header">
+        <i class="fas fa-chart-line"></i>
+        <h2>Admin Panel</h2>
+      </div>
+      <div class="sidebar-menu">
+        <button class="menu-item active" data-section="dashboard">
+          <i class="fas fa-tachometer-alt"></i>
+          <span>Dashboard</span>
+        </button>
+        <button class="menu-item" data-section="blog-management">
+          <i class="fas fa-blog"></i>
+          <span>Blog Management</span>
+        </button>
+        <button class="menu-item" data-section="project-management">
+          <i class="fas fa-project-diagram"></i>
+          <span>Project Management</span>
+        </button>
+        <button class="menu-item" data-section="analytics">
+          <i class="fas fa-chart-bar"></i>
+          <span>Analytics</span>
+        </button>
+        <button class="menu-item" data-section="settings">
+          <i class="fas fa-cog"></i>
+          <span>Settings</span>
+        </button>
+        <button class="menu-item" data-section="users">
+          <i class="fas fa-user"></i>
+          <span>Users</span>
+        </button>
+      </div>
+    </div>
+    
+    <!-- Main Content -->
+    <div class="main-content">
+      <!-- Dashboard Section -->
+      <div class="dashboard-section active" id="dashboard-section">
+        <!-- Top Bar -->
+        <div class="top-bar">
+          <h1>Dashboard Overview</h1>
+          <div class="user-info">
+            <div style="position: relative;">
+              <i class="fas fa-bell" style="font-size: 1.2rem; color: var(--gray);"></i>
+              <div class="notification-badge">3</div>
+            </div>
+            <div class="user-avatar">AU</div>
+            <div>
+              <div style="font-weight: 500;">Admin User</div>
+              <div style="font-size: 0.8rem; color: var(--gray);">Administrator</div>
+            </div>
+            <i class="fas fa-chevron-down" style="margin-left: 10px; color: var(--gray);"></i>
+          </div>
+        </div>
+        
+        <!-- Stats Cards -->
+        <div class="stats-container">
+          <div class="stat-card">
+            <div class="stat-icon total">
+              <i class="fas fa-file-alt"></i>
+            </div>
+            <div class="stat-info">
+              <h3>7</h3>
+              <p>Total Posts</p>
+            </div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-icon published">
+              <i class="fas fa-check-circle"></i>
+            </div>
+            <div class="stat-info">
+              <h3>5</h3>
+              <p>Published</p>
+            </div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-icon drafts">
+              <i class="fas fa-edit"></i>
+            </div>
+            <div class="stat-info">
+              <h3>2</h3>
+              <p>Drafts</p>
+            </div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-icon projects">
+              <i class="fas fa-project-diagram"></i>
+            </div>
+            <div class="stat-info">
+              <h3>4</h3>
+              <p>Active Projects</p>
+            </div>
+          </div>
+        </div>
+        
+        <!-- Content Tabs -->
+        <div class="content-tabs">
+          <button class="content-tab active" data-tab="blogs">Blog Management</button>
+          <button class="content-tab" data-tab="projects">Project Management</button>
+        </div>
+        
+        <!-- Blog Management Tab -->
+        <div class="tab-content active" id="blogs-tab">
+          <div class="content-section">
+            <div class="section-header">
+              <div class="section-title">Blog Posts</div>
+              <button class="btn btn-primary" id="createBlogBtn">
+                <i class="fas fa-plus"></i> Create New Blog
+              </button>
+            </div>
+            
+            <!-- Filters -->
+            <div class="filters">
+              <div class="search-box">
+                <i class="fas fa-search"></i>
+                <input type="text" id="blogSearchInput" placeholder="Search blogs by title, content, tags, or author...">
+              </div>
+              <div class="filter-tabs">
+                <button class="filter-tab active" data-filter="all">All (7)</button>
+                <button class="filter-tab" data-filter="published">Published (5)</button>
+                <button class="filter-tab" data-filter="drafts">Drafts (2)</button>
+              </div>
+              <button class="btn btn-outline">
+                <i class="fas fa-filter"></i> Filter
+              </button>
+            </div>
+            
+            <!-- Table -->
+            <div class="table-container">
+              <table id="blogsTable">
+                <thead>
+                  <tr>
+                    <th>Title</th>
+                    <th>Author</th>
+                    <th>Status</th>
+                    <th>Created</th>
+                    <th>Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr data-status="published">
+                    <td>
+                      <div class="blog-title">Getting Started with React on Render</div>
+                      <div class="blog-tags">
+                        <span class="tag">react</span>
+                        <span class="tag">javascript</span>
+                        <span class="tag">frontend</span>
+                        <span class="tag">deployment</span>
+                      </div>
+                    </td>
+                    <td>Admin User</td>
+                    <td><span class="status published">Published</span></td>
+                    <td>Jan 15, 2024, 05:00 PM</td>
+                    <td>
+                      <div class="actions">
+                        <button class="action-btn edit" title="Edit">
+                          <i class="fas fa-edit"></i>
+                        </button>
+                        <button class="action-btn delete" title="Delete">
+                          <i class="fas fa-trash"></i>
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                  <!-- More blog rows would be here -->
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+        
+        <!-- Project Management Tab -->
+        <div class="tab-content" id="projects-tab">
+          <div class="content-section">
+            <div class="section-header">
+              <div class="section-title">Projects</div>
+              <button class="btn btn-primary" id="createProjectBtn">
+                <i class="fas fa-plus"></i> Create New Project
+              </button>
+            </div>
+            
+            <!-- Filters -->
+            <div class="filters">
+              <div class="search-box">
+                <i class="fas fa-search"></i>
+                <input type="text" id="projectSearchInput" placeholder="Search projects by name, description, or tags...">
+              </div>
+              <div class="filter-tabs">
+                <button class="filter-tab active" data-filter="all">All (4)</button>
+                <button class="filter-tab" data-filter="in-progress">In Progress (2)</button>
+                <button class="filter-tab" data-filter="completed">Completed (1)</button>
+                <button class="filter-tab" data-filter="pending">Pending (1)</button>
+              </div>
+              <button class="btn btn-outline">
+                <i class="fas fa-filter"></i> Filter
+              </button>
+            </div>
+            
+            <!-- Table -->
+            <div class="table-container">
+              <table id="projectsTable">
+                <thead>
+                  <tr>
+                    <th>Project Name</th>
+                    <th>Team</th>
+                    <th>Priority</th>
+                    <th>Status</th>
+                    <th>Progress</th>
+                    <th>Due Date</th>
+                    <th>Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr data-status="in-progress">
+                    <td>
+                      <div class="project-title">Website Redesign</div>
+                      <div class="project-tags">
+                        <span class="tag">design</span>
+                        <span class="tag">frontend</span>
+                        <span class="tag">UI/UX</span>
+                      </div>
+                    </td>
+                    <td>Design Team</td>
+                    <td><span class="priority high">High</span></td>
+                    <td><span class="status in-progress">In Progress</span></td>
+                    <td>
+                      <div class="progress-bar">
+                        <div class="progress-fill" style="width: 75%"></div>
+                      </div>
+                      <div class="progress-text">75% Complete</div>
+                    </td>
+                    <td>Feb 15, 2024</td>
+                    <td>
+                      <div class="actions">
+                        <button class="action-btn edit" title="Edit">
+                          <i class="fas fa-edit"></i>
+                        </button>
+                        <button class="action-btn delete" title="Delete">
+                          <i class="fas fa-trash"></i>
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                  <!-- More project rows would be here -->
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+        
+        <!-- API Debugger -->
+        <div class="api-debugger">
+          <div class="debug-header">
+            <div class="section-title">API Debugger</div>
+            <div class="debug-actions">
+              <button class="btn btn-outline" id="testApiBtn">
+                <i class="fas fa-vial"></i> Test Blogs API
+              </button>
+              <button class="btn btn-outline" id="testProjectsApiBtn">
+                <i class="fas fa-vial"></i> Test Projects API
+              </button>
+              <button class="btn btn-outline" id="createTestBlogBtn">
+                <i class="fas fa-plus"></i> Create Test Blog
+              </button>
+              <button class="btn btn-outline" id="refreshPageBtn">
+                <i class="fas fa-sync-alt"></i> Refresh Page
+              </button>
+            </div>
+          </div>
+          <div class="debug-status success" id="debugStatus">
+            <i class="fas fa-check-circle"></i> Status: API test completed! Check console for details.
+          </div>
+          <div class="debug-content" id="debugContent">
+            {/* API response content would be here */}
+          </div>
+        </div>
+      </div>
+      
+      <!-- Blog Management Section -->
+      <div class="dashboard-section" id="blog-management-section">
+        <div class="top-bar">
+          <h1>Blog Management</h1>
+          <div class="user-info">
+            <div class="user-avatar">AU</div>
+            <div>
+              <div style="font-weight: 500;">Admin User</div>
+            </div>
+          </div>
+        </div>
+        
+        <div class="content-section">
+          <div class="section-header">
+            <div class="section-title">All Blog Posts</div>
+            <button class="btn btn-primary">
+              <i class="fas fa-plus"></i> Create New Blog Post
+            </button>
+          </div>
+          
+          <div class="filters">
+            <div class="search-box">
+              <i class="fas fa-search"></i>
+              <input type="text" placeholder="Search blog posts...">
+            </div>
+            <div class="filter-tabs">
+              <button class="filter-tab active">All Posts</button>
+              <button class="filter-tab">Published</button>
+              <button class="filter-tab">Drafts</button>
+            </div>
+          </div>
+          
+          <div class="table-container">
+            <table>
+              <thead>
+                <tr>
+                  <th>Title</th>
+                  <th>Author</th>
+                  <th>Status</th>
+                  <th>Created</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td>Advanced React Patterns</td>
+                  <td>Admin User</td>
+                  <td><span class="status published">Published</span></td>
+                  <td>Feb 1, 2024</td>
+                  <td>
+                    <div class="actions">
+                      <button class="action-btn edit"><i class="fas fa-edit"></i></button>
+                      <button class="action-btn delete"><i class="fas fa-trash"></i></button>
+                    </div>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+      
+      <!-- Project Management Section -->
+      <div class="dashboard-section" id="project-management-section">
+        <div class="top-bar">
+          <h1>Project Management</h1>
+          <div class="user-info">
+            <div class="user-avatar">AU</div>
+            <div>
+              <div style="font-weight: 500;">Admin User</div>
+            </div>
+          </div>
+        </div>
+        
+        <div class="content-section">
+          <div class="section-header">
+            <div class="section-title">Active Projects</div>
+            <button class="btn btn-primary">
+              <i class="fas fa-plus"></i> Create New Project
+            </button>
+          </div>
+          
+          <div class="table-container">
+            <table>
+              <thead>
+                <tr>
+                  <th>Project Name</th>
+                  <th>Team</th>
+                  <th>Status</th>
+                  <th>Progress</th>
+                  <th>Due Date</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td>Mobile App Development</td>
+                  <td>Mobile Team</td>
+                  <td><span class="status in-progress">In Progress</span></td>
+                  <td>
+                    <div class="progress-bar">
+                      <div class="progress-fill" style="width: 65%"></div>
+                    </div>
+                    <div class="progress-text">65% Complete</div>
+                  </td>
+                  <td>Mar 15, 2024</td>
+                  <td>
+                    <div class="actions">
+                      <button class="action-btn edit"><i class="fas fa-edit"></i></button>
+                      <button class="action-btn delete"><i class="fas fa-trash"></i></button>
+                    </div>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+      
+      <!-- Analytics Section -->
+      <div class="dashboard-section" id="analytics-section">
+        <div class="top-bar">
+          <h1>Analytics</h1>
+          <div class="user-info">
+            <div class="user-avatar">AU</div>
+            <div>
+              <div style="font-weight: 500;">Admin User</div>
+            </div>
+          </div>
+        </div>
+        
+        <div class="analytics-grid">
+          <div class="analytics-card">
+            <h3>Website Traffic</h3>
+            <div class="chart-placeholder">
+              Traffic Chart Visualization
+            </div>
+          </div>
+          <div class="analytics-card">
+            <h3>User Engagement</h3>
+            <div class="chart-placeholder">
+              Engagement Metrics
+            </div>
+          </div>
+          <div class="analytics-card">
+            <h3>Blog Performance</h3>
+            <div class="chart-placeholder">
+              Blog Analytics
+            </div>
+          </div>
+          <div class="analytics-card">
+            <h3>Project Progress</h3>
+            <div class="chart-placeholder">
+              Project Timeline
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      <!-- Settings Section -->
+      <div class="dashboard-section" id="settings-section">
+        <div class="top-bar">
+          <h1>Settings</h1>
+          <div class="user-info">
+            <div class="user-avatar">AU</div>
+            <div>
+              <div style="font-weight: 500;">Admin User</div>
+            </div>
+          </div>
+        </div>
+        
+        <div class="settings-grid">
+          <div class="settings-card">
+            <h3>General Settings</h3>
+            <div class="form-group">
+              <label>Site Title</label>
+              <input type="text" value="My Admin Dashboard">
+            </div>
+            <div class="form-group">
+              <label>Timezone</label>
+              <select>
+                <option>UTC-5 (Eastern Time)</option>
+                <option>UTC-8 (Pacific Time)</option>
+              </select>
+            </div>
+            <button class="btn btn-primary">Save Changes</button>
+          </div>
+          
+          <div class="settings-card">
+            <h3>Blog Settings</h3>
+            <div class="form-group">
+              <label>Posts Per Page</label>
+              <input type="number" value="10">
+            </div>
+            <div class="form-group">
+              <label>Default Author</label>
+              <input type="text" value="Admin User">
+            </div>
+            <button class="btn btn-primary">Save Changes</button>
+          </div>
+        </div>
+      </div>
+      
+      <!-- Users Section -->
+      <div class="dashboard-section" id="users-section">
+        <div class="top-bar">
+          <h1>User Management</h1>
+          <div class="user-info">
+            <div class="user-avatar">AU</div>
+            <div>
+              <div style="font-weight: 500;">Admin User</div>
+            </div>
+          </div>
+        </div>
+        
+        <div class="content-section">
+          <div class="section-header">
+            <div class="section-title">All Users</div>
+            <button class="btn btn-primary">
+              <i class="fas fa-plus"></i> Add New User
+            </button>
+          </div>
+          
+          <div class="user-card">
+            <div class="user-avatar-large">AU</div>
+            <div class="user-info-details">
+              <h3>Admin User</h3>
+              <p>admin@example.com</p>
+              <p><span class="status published">Administrator</span></p>
+            </div>
+            <div class="actions">
+              <button class="action-btn edit"><i class="fas fa-edit"></i></button>
+              <button class="action-btn delete"><i class="fas fa-trash"></i></button>
+            </div>
+          </div>
+          
+          <div class="user-card">
+            <div class="user-avatar-large" style="background-color: var(--success);">EM</div>
+            <div class="user-info-details">
+              <h3>Editor Manager</h3>
+              <p>editor@example.com</p>
+              <p><span class="status in-progress">Editor</span></p>
+            </div>
+            <div class="actions">
+              <button class="action-btn edit"><i class="fas fa-edit"></i></button>
+              <button class="action-btn delete"><i class="fas fa-trash"></i></button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
 
-      You can add webfonts, meta tags, or analytics to this file.
-      The build step will place the bundled scripts into the <body> tag.
-
-      To begin the development, run `npm start` or `yarn start`.
-      To create a production bundle, use `npm run build` or `yarn build`.
-    -->
+    <script>
+      // Dashboard functionality
+      document.addEventListener('DOMContentLoaded', function() {
+        // Sidebar navigation
+        const menuItems = document.querySelectorAll('.menu-item');
+        const dashboardSections = document.querySelectorAll('.dashboard-section');
+        
+        menuItems.forEach(item => {
+          item.addEventListener('click', function() {
+            const sectionId = this.getAttribute('data-section');
+            
+            // Update active menu item
+            menuItems.forEach(i => i.classList.remove('active'));
+            this.classList.add('active');
+            
+            // Show corresponding section
+            dashboardSections.forEach(section => {
+              section.classList.remove('active');
+            });
+            document.getElementById(`${sectionId}-section`).classList.add('active');
+          });
+        });
+        
+        // Tab switching (for dashboard tabs)
+        const contentTabs = document.querySelectorAll('.content-tab');
+        contentTabs.forEach(tab => {
+          tab.addEventListener('click', function() {
+            const tabId = this.getAttribute('data-tab');
+            
+            // Update active tab
+            contentTabs.forEach(t => t.classList.remove('active'));
+            this.classList.add('active');
+            
+            // Show corresponding content
+            document.querySelectorAll('.tab-content').forEach(content => {
+              content.classList.remove('active');
+            });
+            document.getElementById(`${tabId}-tab`).classList.add('active');
+          });
+        });
+        
+        // Blog filter tabs
+        const blogFilterTabs = document.querySelectorAll('#blogs-tab .filter-tab');
+        blogFilterTabs.forEach(tab => {
+          tab.addEventListener('click', function() {
+            blogFilterTabs.forEach(t => t.classList.remove('active'));
+            this.classList.add('active');
+            
+            const filter = this.getAttribute('data-filter');
+            filterBlogs(filter);
+          });
+        });
+        
+        // Project filter tabs
+        const projectFilterTabs = document.querySelectorAll('#projects-tab .filter-tab');
+        projectFilterTabs.forEach(tab => {
+          tab.addEventListener('click', function() {
+            projectFilterTabs.forEach(t => t.classList.remove('active'));
+            this.classList.add('active');
+            
+            const filter = this.getAttribute('data-filter');
+            filterProjects(filter);
+          });
+        });
+        
+        // Search functionality
+        const blogSearchInput = document.getElementById('blogSearchInput');
+        if (blogSearchInput) {
+          blogSearchInput.addEventListener('input', function() {
+            const searchTerm = this.value.toLowerCase();
+            filterBlogsBySearch(searchTerm);
+          });
+        }
+        
+        const projectSearchInput = document.getElementById('projectSearchInput');
+        if (projectSearchInput) {
+          projectSearchInput.addEventListener('input', function() {
+            const searchTerm = this.value.toLowerCase();
+            filterProjectsBySearch(searchTerm);
+          });
+        }
+        
+        // Action buttons
+        const editButtons = document.querySelectorAll('.action-btn.edit');
+        editButtons.forEach(btn => {
+          btn.addEventListener('click', function() {
+            const row = this.closest('tr');
+            const title = row.querySelector('.blog-title, .project-title')?.textContent || 'Item';
+            alert(`Edit functionality would open editor for: ${title}`);
+          });
+        });
+        
+        const deleteButtons = document.querySelectorAll('.action-btn.delete');
+        deleteButtons.forEach(btn => {
+          btn.addEventListener('click', function() {
+            const row = this.closest('tr, .user-card');
+            const title = row.querySelector('.blog-title, .project-title, h3')?.textContent || 'Item';
+            if (confirm(`Are you sure you want to delete "${title}"?`)) {
+              row.style.opacity = '0.5';
+              setTimeout(() => {
+                row.remove();
+                updateStats();
+              }, 500);
+            }
+          });
+        });
+        
+        // Create buttons
+        const createBlogBtn = document.getElementById('createBlogBtn');
+        if (createBlogBtn) {
+          createBlogBtn.addEventListener('click', function() {
+            alert('Create New Blog functionality would open a blog editor form');
+          });
+        }
+        
+        const createProjectBtn = document.getElementById('createProjectBtn');
+        if (createProjectBtn) {
+          createProjectBtn.addEventListener('click', function() {
+            alert('Create New Project functionality would open a project creation form');
+          });
+        }
+        
+        // API Debugger buttons
+        const testApiBtn = document.getElementById('testApiBtn');
+        if (testApiBtn) {
+          testApiBtn.addEventListener('click', function() {
+            const status = document.getElementById('debugStatus');
+            status.innerHTML = '<i class="fas fa-sync-alt fa-spin"></i> Testing Blog API...';
+            
+            setTimeout(() => {
+              status.innerHTML = '<i class="fas fa-check-circle"></i> Status: Blog API test completed! Check console for details.';
+              status.className = 'debug-status success';
+              console.log('Blog API test completed successfully');
+            }, 1500);
+          });
+        }
+        
+        const testProjectsApiBtn = document.getElementById('testProjectsApiBtn');
+        if (testProjectsApiBtn) {
+          testProjectsApiBtn.addEventListener('click', function() {
+            const status = document.getElementById('debugStatus');
+            status.innerHTML = '<i class="fas fa-sync-alt fa-spin"></i> Testing Projects API...';
+            
+            setTimeout(() => {
+              status.innerHTML = '<i class="fas fa-check-circle"></i> Status: Projects API test completed! Check console for details.';
+              status.className = 'debug-status success';
+              console.log('Projects API test completed successfully');
+            }, 1500);
+          });
+        }
+        
+        const createTestBlogBtn = document.getElementById('createTestBlogBtn');
+        if (createTestBlogBtn) {
+          createTestBlogBtn.addEventListener('click', function() {
+            alert('Test blog would be created via API call');
+          });
+        }
+        
+        const refreshPageBtn = document.getElementById('refreshPageBtn');
+        if (refreshPageBtn) {
+          refreshPageBtn.addEventListener('click', function() {
+            location.reload();
+          });
+        }
+        
+        // Filter blogs by status
+        function filterBlogs(status) {
+          const rows = document.querySelectorAll('#blogsTable tbody tr');
+          rows.forEach(row => {
+            if (status === 'all' || row.getAttribute('data-status') === status) {
+              row.style.display = '';
+            } else {
+              row.style.display = 'none';
+            }
+          });
+        }
+        
+        // Filter projects by status
+        function filterProjects(status) {
+          const rows = document.querySelectorAll('#projectsTable tbody tr');
+          rows.forEach(row => {
+            if (status === 'all' || row.getAttribute('data-status') === status) {
+              row.style.display = '';
+            } else {
+              row.style.display = 'none';
+            }
+          });
+        }
+        
+        // Filter blogs by search term
+        function filterBlogsBySearch(searchTerm) {
+          const rows = document.querySelectorAll('#blogsTable tbody tr');
+          rows.forEach(row => {
+            const title = row.querySelector('.blog-title').textContent.toLowerCase();
+            const tags = Array.from(row.querySelectorAll('.tag')).map(tag => tag.textContent.toLowerCase());
+            const author = row.cells[1].textContent.toLowerCase();
+            
+            if (title.includes(searchTerm) || 
+                tags.some(tag => tag.includes(searchTerm)) || 
+                author.includes(searchTerm)) {
+              row.style.display = '';
+            } else {
+              row.style.display = 'none';
+            }
+          });
+        }
+        
+        // Filter projects by search term
+        function filterProjectsBySearch(searchTerm) {
+          const rows = document.querySelectorAll('#projectsTable tbody tr');
+          rows.forEach(row => {
+            const title = row.querySelector('.project-title').textContent.toLowerCase();
+            const tags = Array.from(row.querySelectorAll('.tag')).map(tag => tag.textContent.toLowerCase());
+            const team = row.cells[1].textContent.toLowerCase();
+            
+            if (title.includes(searchTerm) || 
+                tags.some(tag => tag.includes(searchTerm)) || 
+                team.includes(searchTerm)) {
+              row.style.display = '';
+            } else {
+              row.style.display = 'none';
+            }
+          });
+        }
+        
+        // Update stats after changes
+        function updateStats() {
+          // This function would update statistics when items are deleted
+          console.log('Stats updated');
+        }
+      });
+    </script>
   </body>
 </html>

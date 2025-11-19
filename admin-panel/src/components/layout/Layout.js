@@ -1,19 +1,26 @@
-import React from 'react';
+import React, { useState } from 'react';
 import Sidebar from './Sidebar';
 import Header from './Header';
+import './Layout.css';
 
 const Layout = ({ children }) => {
+  const [isSidebarOnLeft, setIsSidebarOnLeft] = useState(true);
+
+  const toggleSidebarPosition = () => {
+    setIsSidebarOnLeft(!isSidebarOnLeft);
+  };
+
   return (
-    <div style={{ display: 'flex', minHeight: '100vh' }}>
-      <Sidebar />
-      <div style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
+    <div className="layout">
+      {/* Sidebar - position changes based on state */}
+      <div className={`sidebar-container ${isSidebarOnLeft ? 'sidebar-left' : 'sidebar-right'}`}>
+        <Sidebar onAdminPanelClick={toggleSidebarPosition} />
+      </div>
+
+      {/* Main content */}
+      <div className={`main-content ${isSidebarOnLeft ? 'content-with-left-sidebar' : 'content-with-right-sidebar'}`}>
         <Header />
-        <main style={{ 
-          flex: 1, 
-          padding: '20px', 
-          backgroundColor: '#f5f5f5',
-          overflow: 'auto'
-        }}>
+        <main className="content-area">
           {children}
         </main>
       </div>
