@@ -1,260 +1,347 @@
-// src/components/dashboard/BlogsManager.js
+// src/components/dashboard/BlogManager.js
 import React, { useState, useEffect } from 'react';
-import BlogForm from '../forms/BlogForm';
-import { blogAPI } from '../../services/api';
-import './BlogsManager.css'; // Optional: for styling
+import BlogForm from '../../Components/forms/BlogForm'; // Adjust path if needed
+import { blogService } from '../../services/blogService';
+import './BlogManager.css';
 
-const BlogsManager = () => {
+const BlogManager = () => {
   const [blogs, setBlogs] = useState([]);
+  const [loading, setLoading] = useState(false);
   const [showForm, setShowForm] = useState(false);
   const [editingBlog, setEditingBlog] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
-  const [success, setSuccess] = useState(null);
+  const [formError, setFormError] = useState('');
+  const [successMessage, setSuccessMessage] = useState('');
 
-  const fetchBlogs = async () => {
-    try {
-      setLoading(true);
-      setError(null);
-      console.log('🔍 Fetching blogs from API...');
-      
-      const response = await blogAPI.getAll();
-      console.log('📦 API Response:', response);
-      
-      // Handle different response formats
-      if (response && response.success) {
-        // Format 1: { success: true, data: { blogs: [] } }
-        const blogsData = response.data?.blogs || response.blogs || response.data;
-        if (Array.isArray(blogsData)) {
-          setBlogs(blogsData);
-          console.log(`✅ Loaded ${blogsData.length} blogs`);
-        } else {
-          console.error('❌ Expected array but got:', typeof blogsData, blogsData);
-          setBlogs([]);
-          setError('Invalid data format received from server');
-        }
-      } else if (Array.isArray(response)) {
-        // Format 2: Direct array response
-        setBlogs(response);
-        console.log(`✅ Loaded ${response.length} blogs (direct array)`);
-      } else {
-        console.error('❌ Unexpected response format:', response);
-        setBlogs([]);
-        setError('Unexpected response format from server');
-      }
-    } catch (err) {
-      console.error('❌ Error fetching blogs:', err);
-      setError(err.message || 'Failed to load blogs. Please check your connection.');
-      setBlogs([]);
-    } finally {
-      setLoading(false);
-    }
-  };
-
+  // Fetch blogs on component mount
   useEffect(() => {
     fetchBlogs();
   }, []);
 
-  const handleAdd = () => {
-    setEditingBlog(null);
-    setShowForm(true);
-    setError(null);
-    setSuccess(null);
-  };
-
-  const handleEdit = (blog) => {
-    setEditingBlog(blog);
-    setShowForm(true);
-    setError(null);
-    setSuccess(null);
-  };
-
-  const handleDelete = async (id) => {
-    if (!window.confirm('Are you sure you want to delete this blog?')) {
-      return;
-    }
-
+  const fetchBlogs = async () => {
     try {
       setLoading(true);
-      setError(null);
-      console.log('🗑️ Deleting blog:', id);
+      const response = await blogService.getBlogs();
       
-      await blogAPI.delete(id);
-      
-      // Update local state
-      setBlogs(prevBlogs => prevBlogs.filter(b => b._id !== id && b.id !== id));
-      setSuccess('Blog deleted successfully');
-      
-      console.log('✅ Blog deleted successfully');
-    } catch (err) {
-      console.error('❌ Error deleting blog:', err);
-      setError(err.message || 'Failed to delete blog');
+      if (response.success) {
+        setBlogs(response.data || []);
+      }
+    } catch (error) {
+      console.error('Error fetching blogs:', error);
     } finally {
       setLoading(false);
     }
   };
 
-  const handleFormSubmit = async (formData) => {
+  // ============ CRITICAL: HOW TO CALL BLOGFORM ============
+
+  // 1. CREATE NEW BLOG FUNCTION - This is passed to BlogForm's onSubmit
+  const handleCreateBlog = async (formData) => {
+    console.log('🚀 handleCreateBlog called with:', formData);
+    
     try {
       setLoading(true);
-      setError(null);
-      console.log('💾 Saving blog:', editingBlog ? 'Editing' : 'Creating', formData);
-
-      let result;
-      if (editingBlog) {
-        const id = editingBlog._id || editingBlog.id;
-        result = await blogAPI.update(id, formData);
-      } else {
-        result = await blogAPI.create(formData);
-      }
-
-      console.log('✅ Save result:', result);
-
-      if (result && result.success) {
-        setSuccess(editingBlog ? 'Blog updated successfully' : 'Blog created successfully');
+      setFormError('');
+      
+      // Format the data for your API
+      const blogData = {
+        title: formData.title,
+        excerpt: formData.excerpt,
+        content: formData.content,
+        author: formData.author,
+        readTime: formData.readTime,
+        tags: formData.tags,
+        status: formData.status,
+        featured: formData.featured,
+        imageUrl: formData.imageUrl || formData.imagePreview || '',
+        // Add any other required fields
+        publishedAt: formData.status === 'published' ? new Date().toISOString() : null
+      };
+      
+      console.log('📤 Sending to API:', blogData);
+      
+      // Call your API service
+      const response = await blogService.createBlog(blogData);
+      console.log('📝 API Response:', response);
+      
+      if (response && response.success) {
+        // Add new blog to state
+        setBlogs(prev => [response.data, ...prev]);
+        
+        // Close the form
         setShowForm(false);
-        setEditingBlog(null);
+        
+        // Show success message
+        setSuccessMessage('✅ Blog created successfully!');
+        setTimeout(() => setSuccessMessage(''), 3000);
         
         // Refresh the list
         await fetchBlogs();
       } else {
-        throw new Error(result?.message || 'Failed to save blog');
+        throw new Error(response?.error || 'Failed to create blog');
       }
-    } catch (err) {
-      console.error('❌ Error saving blog:', err);
-      setError(err.message || 'Failed to save blog. Please try again.');
+    } catch (error) {
+      console.error('❌ Error creating blog:', error);
+      setFormError(error.message || 'Failed to create blog. Please try again.');
     } finally {
       setLoading(false);
     }
   };
 
-  const handleCancel = () => {
-    setShowForm(false);
-    setEditingBlog(null);
-    setError(null);
+  // 2. EDIT EXISTING BLOG FUNCTION
+  const handleEditBlog = async (formData) => {
+    console.log('✏️ handleEditBlog called for:', editingBlog?._id);
+    
+    try {
+      setLoading(true);
+      setFormError('');
+      
+      const blogData = {
+        title: formData.title,
+        excerpt: formData.excerpt,
+        content: formData.content,
+        author: formData.author,
+        readTime: formData.readTime,
+        tags: formData.tags,
+        status: formData.status,
+        featured: formData.featured,
+        imageUrl: formData.imageUrl || formData.imagePreview || '',
+        updatedAt: new Date().toISOString()
+      };
+      
+      const response = await blogService.updateBlog(editingBlog._id, blogData);
+      
+      if (response && response.success) {
+        // Update blog in state
+        setBlogs(prev => prev.map(blog => 
+          blog._id === editingBlog._id ? response.data : blog
+        ));
+        
+        // Close the form
+        setShowForm(false);
+        setEditingBlog(null);
+        
+        // Show success message
+        setSuccessMessage('✅ Blog updated successfully!');
+        setTimeout(() => setSuccessMessage(''), 3000);
+      } else {
+        throw new Error(response?.error || 'Failed to update blog');
+      }
+    } catch (error) {
+      console.error('❌ Error updating blog:', error);
+      setFormError(error.message || 'Failed to update blog. Please try again.');
+    } finally {
+      setLoading(false);
+    }
   };
 
-  // Clear messages after 5 seconds
-  useEffect(() => {
-    if (error || success) {
-      const timer = setTimeout(() => {
-        setError(null);
-        setSuccess(null);
-      }, 5000);
-      return () => clearTimeout(timer);
-    }
-  }, [error, success]);
+  // 3. OPEN CREATE FORM
+  const handleCreateClick = () => {
+    console.log('➕ Opening create form...');
+    
+    // Clear any previous editing data
+    setEditingBlog(null);
+    
+    // Show the form
+    setShowForm(true);
+    
+    // Clear any previous errors/messages
+    setFormError('');
+    setSuccessMessage('');
+  };
 
-  if (loading && blogs.length === 0) {
-    return (
-      <div className="blogs-manager loading">
-        <div className="loading-spinner">Loading blogs...</div>
-      </div>
-    );
-  }
+  // 4. OPEN EDIT FORM
+  const handleEditClick = (blog) => {
+    console.log('✏️ Opening edit form for:', blog._id);
+    
+    // Set the blog to edit
+    setEditingBlog(blog);
+    
+    // Show the form
+    setShowForm(true);
+    
+    // Clear messages
+    setFormError('');
+    setSuccessMessage('');
+  };
+
+  // 5. CLOSE/CANCEL FORM
+  const handleCancelForm = () => {
+    console.log('❌ Closing form...');
+    
+    // Check if there are unsaved changes
+    if (editingBlog && window.confirm('Are you sure? Unsaved changes will be lost.')) {
+      setShowForm(false);
+      setEditingBlog(null);
+    } else if (!editingBlog) {
+      // For create mode
+      setShowForm(false);
+    }
+  };
+
+  // 6. DELETE BLOG
+  const handleDeleteBlog = async (blogId) => {
+    if (window.confirm('Are you sure you want to delete this blog?')) {
+      try {
+        setLoading(true);
+        const response = await blogService.deleteBlog(blogId);
+        
+        if (response.success) {
+          setBlogs(prev => prev.filter(blog => blog._id !== blogId));
+          setSuccessMessage('✅ Blog deleted successfully!');
+          setTimeout(() => setSuccessMessage(''), 3000);
+        }
+      } catch (error) {
+        console.error('Error deleting blog:', error);
+        setFormError('Failed to delete blog: ' + error.message);
+      } finally {
+        setLoading(false);
+      }
+    }
+  };
+
+  // ============ RENDERING ============
 
   return (
-    <div className="blogs-manager">
-      <div className="blogs-header">
-        <h2>Blog Management</h2>
-        <button 
-          className="btn btn-primary" 
-          onClick={handleAdd}
-          disabled={loading}
-        >
-          + Add New Blog
-        </button>
+    <div className="blog-manager">
+      {/* Header */}
+      <div className="blog-header">
+        <h1>📝 Blog Management</h1>
+        <div className="header-actions">
+          <button 
+            className="btn btn-primary"
+            onClick={handleCreateClick}
+            disabled={loading}
+          >
+            + Create New Blog
+          </button>
+        </div>
       </div>
 
       {/* Messages */}
-      {error && (
-        <div className="alert alert-error">
-          ❌ {error}
+      {successMessage && (
+        <div className="alert alert-success">
+          {successMessage}
         </div>
       )}
       
-      {success && (
-        <div className="alert alert-success">
-          ✅ {success}
+      {formError && (
+        <div className="alert alert-error">
+          {formError}
         </div>
       )}
 
-      {/* Blog Form Modal */}
+      {/* BLOGFORM MODAL - CRITICAL PART */}
       {showForm && (
-        <BlogForm
-          blog={editingBlog}
-          onSubmit={handleFormSubmit}
-          onCancel={handleCancel}
-          loading={loading}
-        />
+        <>
+          {/* Backdrop */}
+          <div 
+            className="modal-backdrop"
+            onClick={handleCancelForm}
+          />
+          
+          {/* Modal Container */}
+          <div className="modal-container">
+            <button 
+              className="modal-close-btn"
+              onClick={handleCancelForm}
+            >
+              ×
+            </button>
+            
+            {/* RENDER BLOGFORM COMPONENT HERE */}
+            <BlogForm
+              key={editingBlog?._id || 'create'} // Important for re-rendering
+              blog={editingBlog} // Pass blog for edit mode, null for create
+              onSubmit={editingBlog ? handleEditBlog : handleCreateBlog} // Pass correct handler
+              onCancel={handleCancelForm} // Pass cancel handler
+              loading={loading} // Pass loading state
+              // You can also pass initialData for create mode if needed:
+              initialData={{
+                title: '',
+                content: '',
+                author: 'Admin',
+                status: 'draft',
+                featured: false,
+                // ... other default values
+              }}
+            />
+          </div>
+        </>
       )}
 
-      {/* Blogs List */}
-      <div className="blogs-content">
-        <div className="blogs-stats">
-          <h3>Blog Posts ({blogs.length})</h3>
-          {loading && <div className="loading-small">Refreshing...</div>}
-        </div>
-
-        {blogs.length === 0 ? (
+      {/* Blog List Table */}
+      <div className="blog-list">
+        {loading && blogs.length === 0 ? (
+          <div className="loading">Loading blogs...</div>
+        ) : blogs.length === 0 ? (
           <div className="empty-state">
-            <p>No blog posts found.</p>
-            <button onClick={handleAdd} className="btn btn-primary">
+            <p>No blogs found.</p>
+            <button onClick={handleCreateClick} className="btn btn-primary">
               Create Your First Blog
             </button>
           </div>
         ) : (
-          <div className="blogs-list">
-            {blogs.map(blog => (
-              <div key={blog._id || blog.id} className="blog-card">
-                <div className="blog-header">
-                  <h4 className="blog-title">{blog.title || 'Untitled'}</h4>
-                  <span className={`blog-status ${blog.status || 'draft'}`}>
-                    {blog.status || 'draft'}
-                  </span>
-                </div>
-                
-                <p className="blog-excerpt">
-                  {blog.excerpt || blog.content?.substring(0, 100) || 'No content'}...
-                </p>
-                
-                <div className="blog-meta">
-                  <span className="blog-author">
-                    By: {blog.author || 'Unknown'}
-                  </span>
-                  <span className="blog-date">
-                    {blog.createdAt ? new Date(blog.createdAt).toLocaleDateString() : 'Unknown date'}
-                  </span>
-                  {blog.views !== undefined && (
-                    <span className="blog-views">
-                      👁️ {blog.views} views
+          <table className="blog-table">
+            <thead>
+              <tr>
+                <th>Title</th>
+                <th>Author</th>
+                <th>Status</th>
+                <th>Date</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {blogs.map(blog => (
+                <tr key={blog._id}>
+                  <td>
+                    <strong>{blog.title}</strong>
+                    <div className="blog-excerpt">
+                      {blog.excerpt?.substring(0, 100)}...
+                    </div>
+                  </td>
+                  <td>{blog.author}</td>
+                  <td>
+                    <span className={`status-badge status-${blog.status}`}>
+                      {blog.status}
                     </span>
-                  )}
-                </div>
-
-                <div className="blog-actions">
-                  <button 
-                    onClick={() => handleEdit(blog)}
-                    className="btn btn-edit"
-                    disabled={loading}
-                  >
-                    Edit
-                  </button>
-                  <button 
-                    onClick={() => handleDelete(blog._id || blog.id)}
-                    className="btn btn-delete"
-                    disabled={loading}
-                  >
-                    Delete
-                  </button>
-                </div>
-              </div>
-            ))}
-          </div>
+                  </td>
+                  <td>
+                    {blog.createdAt ? new Date(blog.createdAt).toLocaleDateString() : 'N/A'}
+                  </td>
+                  <td className="actions">
+                    <button 
+                      className="btn-action btn-edit"
+                      onClick={() => handleEditClick(blog)}
+                      title="Edit"
+                    >
+                      Edit
+                    </button>
+                    <button 
+                      className="btn-action btn-delete"
+                      onClick={() => handleDeleteBlog(blog._id)}
+                      title="Delete"
+                    >
+                      Delete
+                    </button>
+                    {blog.status === 'published' && (
+                      <button 
+                        className="btn-action btn-view"
+                        onClick={() => window.open(`/blog/${blog._id}`, '_blank')}
+                        title="View"
+                      >
+                        View
+                      </button>
+                    )}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         )}
       </div>
     </div>
   );
 };
 
-export default BlogsManager;
+export default BlogManager;

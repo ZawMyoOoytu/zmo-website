@@ -1,68 +1,68 @@
-// admin-panel/src/App.js - CLEAN FIXED VERSION
+// admin-panel/src/App.js - COMPLETE VERSION
 import React, { Suspense, lazy } from 'react';
-import { BrowserRouter as Router, Routes, Route, Navigate, useNavigate } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 
-import LoginPage from './pages/LoginPage';
 import Layout from './components/layout/Layout';
 import LoadingSpinner from './components/common/LoadingSpinner';
 import ErrorBoundary from './components/common/ErrorBoundary';
 import './styles/global.css';
 
-// Enhanced lazy loading with error handling
+// Simple lazy loading with better error handling
 const createLazyComponent = (importFn, componentName) => {
   return lazy(async () => {
     try {
-      console.log(`📥 Loading ${componentName}...`);
       const module = await importFn();
-      console.log(`✅ ${componentName} loaded successfully`);
       return module;
     } catch (error) {
-      console.error(`❌ Failed to load ${componentName}:`, error);
-      
+      console.warn(`⚠️ ${componentName} not found, using fallback`);
       // Return a fallback component
       const FallbackComponent = () => (
-        <div style={{ padding: '20px', textAlign: 'center' }}>
-          <h2>❌ {componentName} Failed to Load</h2>
-          <p>Error: {error.message}</p>
-          <p>Check if the file exists and has no syntax errors.</p>
-          <button 
-            onClick={() => window.location.reload()} 
-            style={{ padding: '10px 20px', margin: '10px', background: '#007bff', color: 'white', border: 'none', borderRadius: '4px' }}
-          >
-            Retry Loading
-          </button>
+        <div style={{ padding: '40px', textAlign: 'center' }}>
+          <div style={{ fontSize: '48px', marginBottom: '20px' }}>🚧</div>
+          <h2 style={{ color: '#6c757d', marginBottom: '10px' }}>{componentName}</h2>
+          <p style={{ color: '#666', marginBottom: '20px' }}>
+            This feature is under development.
+          </p>
+          <div style={{ 
+            backgroundColor: '#f8f9fa', 
+            padding: '15px', 
+            borderRadius: '8px',
+            display: 'inline-block'
+          }}>
+            <p><strong>Expected file:</strong> {componentName}.js</p>
+          </div>
         </div>
       );
-      
       return { default: FallbackComponent };
     }
   });
 };
 
-// Lazy load pages
-const DashboardPage = createLazyComponent(() => import('./pages/DashboardPage'), 'DashboardPage');
+// FIXED: Only try the correct import paths
 const BlogList = createLazyComponent(() => import('./pages/Blogs/BlogList'), 'BlogList');
 const BlogCreate = createLazyComponent(() => import('./pages/Blogs/BlogCreate'), 'BlogCreate');
 const BlogEdit = createLazyComponent(() => import('./pages/Blogs/BlogEdit'), 'BlogEdit');
 const BlogView = createLazyComponent(() => import('./pages/Blogs/BlogView'), 'BlogView');
+
+// Other pages
+const LoginPage = createLazyComponent(() => import('./pages/LoginPage'), 'LoginPage');
+const DashboardPage = createLazyComponent(() => import('./pages/DashboardPage'), 'DashboardPage');
 const ProjectsPage = createLazyComponent(() => import('./pages/ProjectsPage'), 'ProjectsPage');
-const NotFoundPage = createLazyComponent(() => import('./pages/NotFoundPage'), 'NotFoundPage');
 
 // Route constants
 export const ROUTES = {
   LOGIN: '/login',
-  DASHBOARD: '/',
+  DASHBOARD: '/dashboard',
   BLOGS: '/blogs',
   BLOGS_CREATE: '/blogs/create',
   BLOGS_EDIT: '/blogs/edit/:id',
   BLOGS_VIEW: '/blogs/view/:id',
   PROJECTS: '/projects',
-  NOT_FOUND: '*'
 };
 
 // Loading components
-const PageLoader = ({ message = "Loading page..." }) => (
+const PageLoader = ({ message = "Loading..." }) => (
   <div style={{ 
     display: 'flex', 
     justifyContent: 'center', 
@@ -77,7 +77,12 @@ const PageLoader = ({ message = "Loading page..." }) => (
 );
 
 const AuthLoader = () => (
-  <div className="loading-screen">
+  <div style={{ 
+    display: 'flex', 
+    justifyContent: 'center', 
+    alignItems: 'center', 
+    height: '100vh' 
+  }}>
     <LoadingSpinner size="large" message="Checking authentication..." />
   </div>
 );
@@ -86,22 +91,14 @@ const AuthLoader = () => (
 const ProtectedRoute = ({ children }) => {
   const { isAuthenticated, loading } = useAuth();
 
-  console.log('🛡️ ProtectedRoute check:', { isAuthenticated, loading, path: window.location.pathname });
-
   if (loading) {
     return <AuthLoader />;
   }
 
-  if (!isAuthenticated) {
-    console.log('🔐 Redirecting to login - not authenticated');
-    return <Navigate to={ROUTES.LOGIN} replace />;
-  }
-
-  console.log('✅ Access granted to protected route');
-  return children;
+  return isAuthenticated ? children : <Navigate to={ROUTES.LOGIN} replace />;
 };
 
-// Public Route Component
+// Public Route Component (for login page)
 const PublicRoute = ({ children }) => {
   const { isAuthenticated, loading } = useAuth();
 
@@ -109,193 +106,144 @@ const PublicRoute = ({ children }) => {
     return <AuthLoader />;
   }
 
-  if (isAuthenticated) {
-    return <Navigate to={ROUTES.DASHBOARD} replace />;
-  }
-
-  return children;
+  return !isAuthenticated ? children : <Navigate to={ROUTES.DASHBOARD} replace />;
 };
 
-// Debug component for testing
-const DebugRoute = () => {
-  const navigate = useNavigate();
-  
+// FIXED: Added the missing closing functions and main App component
+
+// Main App Component
+const AppContent = () => {
   return (
-    <div style={{ padding: '20px' }}>
-      <h1>🐛 Debug Page</h1>
-      <p>Use this page to test if routes and components are working.</p>
-      
-      <div style={{ display: 'grid', gap: '10px', marginTop: '20px', maxWidth: '400px' }}>
-        <button 
-          onClick={() => navigate('/blogs/create')}
-          style={{ padding: '15px', background: '#007bff', color: 'white', border: 'none', borderRadius: '5px', fontSize: '16px' }}
-        >
-          Test Blog Create Page
-        </button>
-        
-        <button 
-          onClick={() => navigate('/blogs')}
-          style={{ padding: '15px', background: '#28a745', color: 'white', border: 'none', borderRadius: '5px', fontSize: '16px' }}
-        >
-          Test Blog List Page
-        </button>
-        
-        <button 
-          onClick={() => {
-            // Test if BlogCreate component can be imported
-            import('./pages/Blogs/BlogCreate').then(module => {
-              alert('✅ BlogCreate can be imported successfully!');
-              console.log('BlogCreate module:', module);
-            }).catch(error => {
-              alert('❌ BlogCreate import failed: ' + error.message);
-              console.error('Import error:', error);
-            });
-          }}
-          style={{ padding: '15px', background: '#dc3545', color: 'white', border: 'none', borderRadius: '5px', fontSize: '16px' }}
-        >
-          Test BlogCreate Import
-        </button>
+    <Router>
+      <Routes>
+        {/* Login Route (Public) */}
+        <Route 
+          path={ROUTES.LOGIN} 
+          element={
+            <PublicRoute>
+              <Suspense fallback={<PageLoader message="Loading login..." />}>
+                <LoginPage />
+              </Suspense>
+            </PublicRoute>
+          } 
+        />
 
-        <button 
-          onClick={() => {
-            // Check if file exists by testing the import
-            console.log('🔍 Checking if BlogCreate file exists...');
-            fetch('/src/pages/Blogs/BlogCreate.js')
-              .then(response => {
-                if (response.ok) {
-                  alert('✅ BlogCreate.js file exists!');
-                } else {
-                  alert('❌ BlogCreate.js file not found!');
-                }
-              })
-              .catch(() => {
-                alert('❌ Cannot check file existence (CORS issue)');
-              });
-          }}
-          style={{ padding: '15px', background: '#ffc107', color: 'black', border: 'none', borderRadius: '5px', fontSize: '16px' }}
-        >
-          Check BlogCreate File
-        </button>
-      </div>
+        {/* Dashboard Route (Protected) */}
+        <Route 
+          path={ROUTES.DASHBOARD} 
+          element={
+            <ProtectedRoute>
+              <Layout>
+                <ErrorBoundary>
+                  <Suspense fallback={<PageLoader message="Loading dashboard..." />}>
+                    <DashboardPage />
+                  </Suspense>
+                </ErrorBoundary>
+              </Layout>
+            </ProtectedRoute>
+          } 
+        />
 
-      <div style={{ marginTop: '30px', padding: '15px', background: '#f8f9fa', borderRadius: '5px' }}>
-        <h3>Current Route Info:</h3>
-        <p><strong>Pathname:</strong> {window.location.pathname}</p>
-        <p><strong>Full URL:</strong> {window.location.href}</p>
-      </div>
-    </div>
+        {/* Blog Routes (Protected) */}
+        <Route 
+          path={ROUTES.BLOGS} 
+          element={
+            <ProtectedRoute>
+              <Layout>
+                <ErrorBoundary>
+                  <Suspense fallback={<PageLoader message="Loading blog list..." />}>
+                    <BlogList />
+                  </Suspense>
+                </ErrorBoundary>
+              </Layout>
+            </ProtectedRoute>
+          } 
+        />
+
+        <Route 
+          path={ROUTES.BLOGS_CREATE} 
+          element={
+            <ProtectedRoute>
+              <Layout>
+                <ErrorBoundary>
+                  <Suspense fallback={<PageLoader message="Loading blog editor..." />}>
+                    <BlogCreate />
+                  </Suspense>
+                </ErrorBoundary>
+              </Layout>
+            </ProtectedRoute>
+          } 
+        />
+
+        <Route 
+          path={ROUTES.BLOGS_EDIT} 
+          element={
+            <ProtectedRoute>
+              <Layout>
+                <ErrorBoundary>
+                  <Suspense fallback={<PageLoader message="Loading blog editor..." />}>
+                    <BlogEdit />
+                  </Suspense>
+                </ErrorBoundary>
+              </Layout>
+            </ProtectedRoute>
+          } 
+        />
+
+        <Route 
+          path={ROUTES.BLOGS_VIEW} 
+          element={
+            <ProtectedRoute>
+              <Layout>
+                <ErrorBoundary>
+                  <Suspense fallback={<PageLoader message="Loading blog..." />}>
+                    <BlogView />
+                  </Suspense>
+                </ErrorBoundary>
+              </Layout>
+            </ProtectedRoute>
+          } 
+        />
+
+        {/* Projects Route (Protected) */}
+        <Route 
+          path={ROUTES.PROJECTS} 
+          element={
+            <ProtectedRoute>
+              <Layout>
+                <ErrorBoundary>
+                  <Suspense fallback={<PageLoader message="Loading projects..." />}>
+                    <ProjectsPage />
+                  </Suspense>
+                </ErrorBoundary>
+              </Layout>
+            </ProtectedRoute>
+          } 
+        />
+
+        {/* Default redirect */}
+        <Route 
+          path="/" 
+          element={<Navigate to={ROUTES.DASHBOARD} replace />} 
+        />
+
+        {/* Catch-all route - redirect to dashboard */}
+        <Route 
+          path="*" 
+          element={<Navigate to={ROUTES.DASHBOARD} replace />} 
+        />
+      </Routes>
+    </Router>
   );
 };
 
-// Route configuration
-const routeConfig = [
-  {
-    path: ROUTES.LOGIN,
-    element: <LoginPage />,
-    public: true,
-    layout: false
-  },
-  {
-    path: ROUTES.DASHBOARD,
-    element: <DashboardPage />,
-    layout: true,
-    name: 'Dashboard'
-  },
-  {
-    path: ROUTES.BLOGS,
-    element: <BlogList />,
-    layout: true,
-    name: 'Blog List'
-  },
-  {
-    path: ROUTES.BLOGS_CREATE,
-    element: <BlogCreate />,
-    layout: true,
-    name: 'Create Blog'
-  },
-  {
-    path: ROUTES.BLOGS_EDIT,
-    element: <BlogEdit />,
-    layout: true,
-    name: 'Edit Blog'
-  },
-  {
-    path: ROUTES.BLOGS_VIEW,
-    element: <BlogView />,
-    layout: true,
-    name: 'View Blog'
-  },
-  {
-    path: ROUTES.PROJECTS,
-    element: <ProjectsPage />,
-    layout: true,
-    name: 'Projects'
-  },
-  {
-    path: ROUTES.NOT_FOUND,
-    element: <NotFoundPage />,
-    layout: true,
-    name: 'Not Found'
-  }
-];
-
-// Route renderer component
-const RouteRenderer = ({ route }) => {
-  const RouteElement = route.layout ? (
-    <Layout>
-      <ErrorBoundary>
-        {route.element}
-      </ErrorBoundary>
-    </Layout>
-  ) : (
-    <ErrorBoundary>
-      {route.element}
-    </ErrorBoundary>
-  );
-
-  if (route.public) {
-    return <PublicRoute>{RouteElement}</PublicRoute>;
-  }
-
-  return <ProtectedRoute>{RouteElement}</ProtectedRoute>;
-};
-
-function App() {
+// Main App Component with AuthProvider
+const App = () => {
   return (
-    <ErrorBoundary>
-      <AuthProvider>
-        <Router>
-          <div className="app">
-            <Suspense fallback={<PageLoader message="Loading application..." />}>
-              <Routes>
-                {/* Debug route - always available */}
-                <Route 
-                  path="/debug" 
-                  element={
-                    <Layout>
-                      <DebugRoute />
-                    </Layout>
-                  } 
-                />
-                
-                {/* Main routes */}
-                {routeConfig.map((route) => (
-                  <Route
-                    key={route.path}
-                    path={route.path}
-                    element={<RouteRenderer route={route} />}
-                  />
-                ))}
-                
-                {/* Redirect root to dashboard */}
-                <Route path="/" element={<Navigate to={ROUTES.DASHBOARD} replace />} />
-              </Routes>
-            </Suspense>
-          </div>
-        </Router>
-      </AuthProvider>
-    </ErrorBoundary>
+    <AuthProvider>
+      <AppContent />
+    </AuthProvider>
   );
-}
+};
 
 export default App;

@@ -36,6 +36,10 @@ const BlogEdit = () => {
 
     if (id) {
       fetchBlog();
+    } else {
+      // If no ID is provided, initialize an empty blog for creation
+      setBlog({ title: '', content: '', tags: [] });
+      setLoading(false);
     }
   }, [id]);
 
@@ -44,19 +48,32 @@ const BlogEdit = () => {
       setSubmitting(true);
       setError('');
       
-      console.log(`✏️ Updating blog ${id}:`, blogData);
-      const result = await blogAPI.update(id, blogData);
-      
-      if (result.success) {
-        console.log('✅ Blog updated successfully!');
-        alert('Blog updated successfully!');
-        navigate('/blogs');
+      if (id) {
+        console.log(`✏️ Updating blog ${id}:`, blogData);
+        const result = await blogAPI.update(id, blogData);
+        
+        if (result.success) {
+          console.log('✅ Blog updated successfully!');
+          alert('Blog updated successfully!');
+          navigate('/blogs');
+        } else {
+          throw new Error(result.message || 'Failed to update blog');
+        }
       } else {
-        throw new Error(result.message || 'Failed to update blog');
+        console.log('📝 Creating new blog:', blogData);
+        const result = await blogAPI.create(blogData);
+        
+        if (result.success) {
+          console.log('✅ Blog created successfully!');
+          alert('Blog created successfully!');
+          navigate('/blogs');
+        } else {
+          throw new Error(result.message || 'Failed to create blog');
+        }
       }
     } catch (error) {
-      console.error('❌ Update error:', error);
-      setError(error.message || 'Failed to update blog. Please try again.');
+      console.error('❌ Submit error:', error);
+      setError(error.message || 'Failed to submit blog. Please try again.');
     } finally {
       setSubmitting(false);
     }
@@ -73,8 +90,8 @@ const BlogEdit = () => {
           <div className="admin-page-header">
             <div className="header-content">
               <div>
-                <h1>Edit Blog</h1>
-                <p>Update blog post: {blog?.title || 'Untitled'}</p>
+                <h1>{id ? 'Edit Blog' : 'Create Blog'}</h1>
+                <p>{id ? `Update blog post: ${blog?.title || 'Untitled'}` : 'Create a new blog post'}</p>
               </div>
               <div className="header-actions">
                 <button 

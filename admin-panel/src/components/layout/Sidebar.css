@@ -1,4 +1,99 @@
-/* Clickable Admin Panel text */
+/* admin-panel/src/components/layout/Sidebar.css */
+
+/* ========================================
+   BASE SIDEBAR STYLES - CRITICAL FIXES
+   ======================================== */
+
+/* Reset all pointer events to ensure clickability */
+.sidebar * {
+  pointer-events: auto !important;
+}
+
+/* Main sidebar container */
+.sidebar {
+  position: fixed;
+  top: 0;
+  left: 0;
+  height: 100vh;
+  background: linear-gradient(180deg, #1a1a2e 0%, #16213e 100%);
+  color: white;
+  z-index: 1000;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: 4px 0 15px rgba(0, 0, 0, 0.1);
+  width: 280px;
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+
+/* Collapsed state */
+.sidebar.collapsed {
+  width: 70px;
+}
+
+/* Network error banner */
+.network-error {
+  background: #ff4757;
+  color: white;
+  padding: 10px 15px;
+  text-align: center;
+  font-size: 0.85rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+/* ========================================
+   HEADER SECTION
+   ======================================== */
+.sidebar-header {
+  padding: 25px 20px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  position: relative;
+}
+
+.logo-container {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.logo {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.logo-icon {
+  font-size: 1.8rem;
+  background: linear-gradient(135deg, #4361ee, #3a0ca3);
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.logo-text {
+  display: flex;
+  flex-direction: column;
+}
+
+.logo-text h3 {
+  margin: 0;
+  font-size: 1.2rem;
+  font-weight: 600;
+  color: white;
+}
+
+.logo-subtitle {
+  font-size: 0.8rem;
+  color: rgba(255, 255, 255, 0.7);
+  margin-top: 2px;
+}
+
+/* Clickable Admin Panel text - YOUR EXISTING CODE */
 .admin-panel-clickable {
   cursor: pointer;
   transition: all 0.2s ease;
@@ -7,7 +102,7 @@
 }
 
 .admin-panel-clickable:hover {
-  color: #4361ee;
+  color: #4cc9f0 !important; /* Brighter color for better visibility */
   transform: translateX(5px);
 }
 
@@ -21,4 +116,339 @@
 
 .admin-panel-clickable:hover::after {
   opacity: 1;
+}
+
+/* Toggle button */
+.toggle-btn {
+  background: rgba(255, 255, 255, 0.1);
+  border: none;
+  color: white;
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.3s;
+}
+
+.toggle-btn:hover {
+  background: rgba(255, 255, 255, 0.2);
+  transform: rotate(180deg);
+}
+
+.toggle-icon {
+  font-size: 1.2rem;
+  transition: transform 0.3s;
+}
+
+.toggle-icon.collapsed {
+  transform: rotate(180deg);
+}
+
+/* ========================================
+   NAVIGATION SECTION - CRITICAL FIXES HERE
+   ======================================== */
+.sidebar-nav {
+  padding: 20px 0;
+}
+
+.nav-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.nav-item {
+  position: relative;
+  margin-bottom: 2px;
+}
+
+/* NAV LINK STYLES - MOST IMPORTANT FIXES */
+.nav-link {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+  padding: 15px 20px;
+  color: rgba(255, 255, 255, 0.8);
+  text-decoration: none;
+  transition: all 0.3s;
+  position: relative;
+  z-index: 2;
+  
+  /* CRITICAL: Ensure links are clickable */
+  cursor: pointer !important;
+  pointer-events: auto !important;
+  user-select: none;
+  
+  /* Remove any default button styles if applied */
+  background: none;
+  border: none;
+  width: 100%;
+  text-align: left;
+  font-family: inherit;
+  font-size: inherit;
+}
+
+/* Hover state */
+.nav-link:hover {
+  background: rgba(255, 255, 255, 0.05);
+  color: white;
+  padding-left: 25px;
+}
+
+/* Active state */
+.nav-link.active {
+  background: linear-gradient(90deg, rgba(67, 97, 238, 0.2) 0%, rgba(67, 97, 238, 0.1) 100%);
+  color: #4cc9f0;
+  border-left: 4px solid #4361ee;
+}
+
+/* Hovered state */
+.nav-link.hovered {
+  background: rgba(255, 255, 255, 0.03);
+}
+
+/* Icon */
+.nav-icon {
+  font-size: 1.3rem;
+  width: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+/* Content when not collapsed */
+.nav-content {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-width: 0; /* Prevent overflow */
+}
+
+.nav-label {
+  font-size: 0.95rem;
+  font-weight: 500;
+  margin-bottom: 3px;
+}
+
+.nav-description {
+  font-size: 0.75rem;
+  color: rgba(255, 255, 255, 0.5);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Collapsed state for nav items */
+.sidebar.collapsed .nav-content {
+  display: none;
+}
+
+.sidebar.collapsed .nav-link {
+  justify-content: center;
+  padding: 15px;
+}
+
+.sidebar.collapsed .nav-link:hover::after {
+  content: attr(data-tooltip);
+  position: absolute;
+  left: 100%;
+  top: 50%;
+  transform: translateY(-50%);
+  background: #1a1a2e;
+  color: white;
+  padding: 8px 12px;
+  border-radius: 6px;
+  font-size: 0.85rem;
+  white-space: nowrap;
+  margin-left: 10px;
+  box-shadow: 2px 2px 10px rgba(0, 0, 0, 0.2);
+  z-index: 1001;
+  pointer-events: none;
+}
+
+/* Active indicator */
+.active-indicator {
+  position: absolute;
+  right: 15px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 8px;
+  height: 8px;
+  background: #4361ee;
+  border-radius: 50%;
+  animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+
+/* Link background effect */
+.link-background {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: linear-gradient(90deg, rgba(67, 97, 238, 0.1), transparent);
+  opacity: 0;
+  transition: opacity 0.3s;
+  z-index: -1;
+}
+
+.nav-link:hover .link-background {
+  opacity: 1;
+}
+
+/* ========================================
+   FOOTER SECTION
+   ======================================== */
+.sidebar-footer {
+  padding: 20px;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  margin-top: auto;
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+}
+
+.user-profile {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.user-avatar {
+  width: 40px;
+  height: 40px;
+  background: linear-gradient(135deg, #7209b7, #3a0ca3);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.2rem;
+}
+
+.user-info {
+  display: flex;
+  flex-direction: column;
+}
+
+.user-name {
+  font-size: 0.9rem;
+  font-weight: 500;
+}
+
+.user-role {
+  font-size: 0.75rem;
+  color: rgba(255, 255, 255, 0.6);
+}
+
+/* ========================================
+   OVERLAY & RESPONSIVE - CRITICAL FIXES
+   ======================================== */
+.sidebar-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  z-index: 999;
+  
+  /* CRITICAL: Overlay should block clicks when sidebar is open on mobile */
+  pointer-events: auto;
+}
+
+/* Hide overlay when sidebar is collapsed or on desktop */
+.sidebar.collapsed + .sidebar-overlay,
+@media (min-width: 769px) {
+  .sidebar-overlay {
+    display: none;
+    pointer-events: none;
+  }
+}
+
+/* ========================================
+   RESPONSIVE DESIGN
+   ======================================== */
+@media (max-width: 768px) {
+  .sidebar {
+    width: 280px;
+    transform: translateX(-100%);
+  }
+  
+  .sidebar:not(.collapsed) {
+    transform: translateX(0);
+  }
+  
+  .sidebar.collapsed {
+    transform: translateX(-100%);
+    width: 280px;
+  }
+  
+  /* Show overlay when sidebar is open on mobile */
+  .sidebar:not(.collapsed) + .sidebar-overlay {
+    display: block;
+  }
+}
+
+/* ========================================
+   DEBUG STYLES (Development only)
+   ======================================== */
+@media (max-width: 768px) {
+  .debug-actions {
+    display: none; /* Hide debug on mobile */
+  }
+}
+
+/* Add a subtle animation for better UX */
+@keyframes slideIn {
+  from {
+    opacity: 0;
+    transform: translateX(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+.nav-item {
+  animation: slideIn 0.3s ease forwards;
+  animation-delay: calc(var(--item-index, 0) * 0.05s);
+}
+
+/* ========================================
+   FIX FOR iOS SAFARI CLICK DELAY
+   ======================================== */
+.nav-link {
+  -webkit-tap-highlight-color: transparent;
+  -webkit-touch-callout: none;
+}
+
+/* ========================================
+   SCROLLBAR STYLING
+   ======================================== */
+.sidebar::-webkit-scrollbar {
+  width: 6px;
+}
+
+.sidebar::-webkit-scrollbar-track {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.sidebar::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.2);
+  border-radius: 3px;
+}
+
+.sidebar::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.3);
 }

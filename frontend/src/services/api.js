@@ -1,51 +1,23 @@
-// src/services/api.js - PRODUCTION READY & LOCAL READY
+// src/services/api.js - COMPLETE FIXED VERSION
 import axios from 'axios';
 
 // ==========================================
-// 🚀 ENVIRONMENT CONFIGURATION
+// 🎯 HARDCODED CONFIGURATION FOR RENDER
 // ==========================================
-const isDevelopment = process.env.NODE_ENV === 'development';
-const isProduction = process.env.NODE_ENV === 'production';
+const API_BASE_URL = 'https://zmo-backend.onrender.com/api';
+const API_TIMEOUT = 30000;
 
-// Dynamic configuration for different environments
-const getApiConfig = () => {
-  if (isDevelopment) {
-    return {
-      baseURL: process.env.REACT_APP_API_URL || 'http://localhost:5000/api',
-      timeout: 15000,
-      debug: true
-    };
-  } else {
-    return {
-      baseURL: process.env.REACT_APP_API_URL || 'https://zmo-backend.onrender.com/api',
-      timeout: 30000, // Increased timeout for Render
-      debug: false
-    };
-  }
-};
+console.log('🎯 Frontend API: Using Render Backend:', API_BASE_URL);
 
-const apiConfig = getApiConfig();
-
-console.log('🔧 API Configuration:', {
-  environment: process.env.NODE_ENV,
-  baseURL: apiConfig.baseURL,
-  timeout: apiConfig.timeout,
-  debug: apiConfig.debug
-});
-
-// ==========================================
-// 🛠️ AXIOS INSTANCE CONFIGURATION
-// ==========================================
+// Create axios instance
 const api = axios.create({
-  baseURL: apiConfig.baseURL,
-  timeout: apiConfig.timeout,
+  baseURL: API_BASE_URL,
+  timeout: API_TIMEOUT,
   headers: { 
     'Content-Type': 'application/json',
     'X-Client': 'zmo-frontend',
-    'X-Client-Version': '2.0.0',
-    'X-Environment': process.env.NODE_ENV
-  },
-  withCredentials: false,
+    'X-Client-Version': '2.0.0'
+  }
 });
 
 // ==========================================
@@ -53,9 +25,7 @@ const api = axios.create({
 // ==========================================
 api.interceptors.request.use(
   (config) => {
-    if (apiConfig.debug) {
-      console.log(`🚀 API Request: ${config.method?.toUpperCase()} ${config.baseURL}${config.url}`);
-    }
+    console.log(`🚀 API Request: ${config.method?.toUpperCase()} ${config.url}`);
     
     // Add auth token if available
     const token = localStorage.getItem('adminToken') || sessionStorage.getItem('adminToken');
@@ -76,256 +46,73 @@ api.interceptors.request.use(
 // ==========================================
 api.interceptors.response.use(
   (response) => {
-    if (apiConfig.debug) {
-      console.log(`✅ API Response: ${response.status} ${response.config.url}`);
-    }
+    console.log(`✅ API Response: ${response.status} ${response.config.url}`);
     return response;
   },
   (error) => {
-    const errorInfo = {
+    console.error('❌ API Error:', {
       url: error.config?.url,
-      method: error.config?.method,
       status: error.response?.status,
-      message: error.message,
-      code: error.code
-    };
-    
-    console.error('❌ API Error:', errorInfo);
-    
-    // Handle specific error cases
-    handleApiError(error);
+      message: error.message
+    });
     
     return Promise.reject(error);
   }
 );
 
 // ==========================================
-// 🛡️ ERROR HANDLER
-// ==========================================
-const handleApiError = (error) => {
-  const status = error.response?.status;
-  
-  switch (status) {
-    case 401:
-      console.log('🔐 Unauthorized - Invalid or expired token');
-      // Clear invalid tokens
-      localStorage.removeItem('adminToken');
-      localStorage.removeItem('adminUser');
-      sessionStorage.removeItem('adminToken');
-      sessionStorage.removeItem('adminUser');
-      break;
-    case 403:
-      console.log('🚫 Forbidden - Insufficient permissions');
-      break;
-    case 404:
-      console.log('🔍 Not Found - API endpoint does not exist');
-      break;
-    case 429:
-      console.log('🚦 Rate Limited - Too many requests');
-      break;
-    case 500:
-      console.log('💥 Server Error - Backend issue');
-      break;
-    case 502:
-    case 503:
-    case 504:
-      console.log('🌐 Backend Unavailable - Server might be starting');
-      break;
-    default:
-      if (error.code === 'NETWORK_ERROR' || error.code === 'ECONNREFUSED') {
-        console.log('🌐 Network Error - Cannot connect to backend');
-      } else if (error.code === 'TIMEOUT') {
-        console.log('⏰ Timeout - Request took too long');
-      } else if (error.message?.includes('CORS')) {
-        console.log('🚫 CORS Error - Check backend CORS configuration');
-      }
-      break;
-  }
-};
-
-// ==========================================
-// 🛠️ UTILITY FUNCTIONS
-// ==========================================
-const showToast = (message, type = 'info') => {
-  if (apiConfig.debug) {
-    console.log(`📢 ${type.toUpperCase()}: ${message}`);
-  }
-};
-
-// ==========================================
 // 🌐 PUBLIC API (for frontend website)
 // ==========================================
-const publicAPI = {
+export const publicAPI = {
   // Get all blogs
   getBlogs: async () => {
     try {
-      if (apiConfig.debug) {
-        console.log('📚 Fetching blogs...');
-      }
-      
+      console.log('📚 Fetching blogs from:', `${API_BASE_URL}/blogs`);
       const response = await api.get('/blogs');
-      
-      if (response.data.success) {
-        if (apiConfig.debug) {
-          console.log(`✅ Found ${response.data.data?.length || 0} blogs`);
-        }
-        return response.data;
-      } else {
-        throw new Error(response.data.message || 'Failed to fetch blogs');
-      }
+      console.log('✅ Blogs fetched successfully:', response.data.data?.length, 'blogs');
+      return response.data;
     } catch (error) {
-      console.error('❌ Failed to fetch blogs:', error.message);
-      
-      // Enhanced error information
-      const enhancedError = new Error(`Failed to load blogs: ${error.message}`);
-      enhancedError.originalError = error;
-      enhancedError.isNetworkError = !error.response;
-      
-      // Fallback data for development
-      if (isDevelopment && !error.response) {
-        console.log('🔄 Using development fallback data');
-        return {
-          success: true,
-          data: [
-            {
-              _id: 'dev-1',
-              title: 'Development Blog Post - Sample 1',
-              excerpt: 'This is sample content for development environment while backend connects.',
-              content: 'This content is served from fallback data while the backend connects. Your backend might be starting up or experiencing connection issues.',
-              author: 'Developer',
-              published: true,
-              tags: ['development', 'sample', 'react'],
-              readTime: 3,
-              createdAt: new Date().toISOString(),
-              updatedAt: new Date().toISOString()
-            },
-            {
-              _id: 'dev-2',
-              title: 'Development Blog Post - Sample 2',
-              excerpt: 'Another sample blog post for development and testing.',
-              content: 'This is another sample blog post that appears when the backend is not available. Check your backend deployment and CORS settings.',
-              author: 'Developer',
-              published: true,
-              tags: ['javascript', 'webdev', 'tutorial'],
-              readTime: 5,
-              createdAt: new Date().toISOString(),
-              updatedAt: new Date().toISOString()
-            }
-          ],
-          count: 2,
-          message: 'Development fallback data - Backend connection failed'
-        };
-      }
-      
-      throw enhancedError;
+      console.error('❌ Error fetching blogs:', error);
+      throw new Error('Failed to load blogs: ' + error.message);
     }
   },
 
   // Get single blog by ID
   getBlogById: async (id) => {
     try {
-      if (apiConfig.debug) {
-        console.log(`📖 Fetching blog ${id}...`);
-      }
-      
+      console.log(`📖 Fetching blog ${id}...`);
       const response = await api.get(`/blogs/${id}`);
-      
-      if (response.data.success) {
-        if (apiConfig.debug) {
-          console.log('✅ Blog fetched successfully');
-        }
-        return response.data;
-      } else {
-        throw new Error('Blog not found');
-      }
+      console.log('✅ Blog fetched successfully');
+      return response.data;
     } catch (error) {
-      console.error(`❌ Failed to fetch blog ${id}:`, error.message);
-      
-      // Enhanced error information
-      const enhancedError = new Error(`Failed to load blog: ${error.message}`);
-      enhancedError.originalError = error;
-      
-      // Fallback for development
-      if (isDevelopment && !error.response) {
-        return {
-          success: true,
-          data: {
-            _id: id,
-            title: 'Development Blog Post',
-            content: 'This is fallback content for development environment. The backend server might be starting or experiencing connection issues.',
-            excerpt: 'Development blog excerpt for testing purposes.',
-            author: 'Developer',
-            published: true,
-            tags: ['development', 'sample', 'fallback'],
-            readTime: 5,
-            createdAt: new Date().toISOString(),
-            updatedAt: new Date().toISOString()
-          },
-          message: 'Development fallback data - Backend connection failed'
-        };
-      }
-      
-      throw enhancedError;
+      console.error('❌ Error fetching blog:', error);
+      throw new Error('Failed to load blog: ' + error.message);
     }
   },
 
   // Get all projects
   getProjects: async () => {
     try {
-      if (apiConfig.debug) {
-        console.log('🚀 Fetching projects...');
-      }
-      
+      console.log('🚀 Fetching projects...');
       const response = await api.get('/projects');
-      
-      if (response.data.success) {
-        if (apiConfig.debug) {
-          console.log(`✅ Found ${response.data.data?.length || 0} projects`);
-        }
-        return response.data;
-      } else {
-        throw new Error('Failed to fetch projects');
-      }
+      console.log('✅ Projects fetched successfully:', response.data.data?.length, 'projects');
+      return response.data;
     } catch (error) {
-      console.error('❌ Failed to fetch projects:', error.message);
-      
-      // Enhanced error information
-      const enhancedError = new Error(`Failed to load projects: ${error.message}`);
-      enhancedError.originalError = error;
-      
-      // Fallback data for development
-      if (isDevelopment && !error.response) {
-        return {
-          success: true,
-          data: [
-            {
-              _id: 'dev-1',
-              title: 'Development Project',
-              description: 'This is a sample project for development environment',
-              technologies: ['React', 'Node.js', 'MongoDB'],
-              category: 'web',
-              published: true,
-              createdAt: new Date().toISOString(),
-              updatedAt: new Date().toISOString()
-            }
-          ],
-          count: 1,
-          message: 'Development fallback data - Backend connection failed'
-        };
-      }
-      
-      throw enhancedError;
+      console.error('❌ Error fetching projects:', error);
+      throw new Error('Failed to load projects: ' + error.message);
     }
   },
 
   // Get single project by ID
   getProjectById: async (id) => {
     try {
+      console.log(`🔍 Fetching project ${id}...`);
       const response = await api.get(`/projects/${id}`);
+      console.log('✅ Project fetched successfully');
       return response.data;
     } catch (error) {
-      console.error('Failed to fetch project:', error);
-      throw error;
+      console.error('❌ Error fetching project:', error);
+      throw new Error('Failed to load project: ' + error.message);
     }
   },
 
@@ -333,7 +120,7 @@ const publicAPI = {
   testConnection: async () => {
     try {
       console.log('🔗 Testing backend connection...');
-      const response = await api.get('/blogs'); // Using blogs endpoint since health might not exist
+      const response = await api.get('/blogs');
       
       console.log('✅ Backend connection successful');
       return { 
@@ -347,17 +134,16 @@ const publicAPI = {
       return { 
         success: false, 
         error: error.message,
-        message: 'Cannot connect to backend server',
-        isNetworkError: !error.response
+        message: 'Cannot connect to backend server'
       };
     }
   }
 };
 
 // ==========================================
-// 🔐 AUTHENTICATION API (for admin panel)
+// 🔐 AUTHENTICATION API
 // ==========================================
-const authAPI = {
+export const authAPI = {
   login: async (email, password, rememberMe = false) => {
     try {
       console.log('🔐 Attempting login...');
@@ -379,9 +165,6 @@ const authAPI = {
           sessionStorage.setItem('adminUser', JSON.stringify(user));
         }
         
-        // Update axios default headers
-        api.defaults.headers.common['Authorization'] = `Bearer ${token}`;
-        
         console.log('✅ Login successful');
         return { success: true, user, token, message };
       } else {
@@ -402,9 +185,6 @@ const authAPI = {
       localStorage.removeItem('adminUser');
       sessionStorage.removeItem('adminToken');
       sessionStorage.removeItem('adminUser');
-      
-      // Remove from axios headers
-      delete api.defaults.headers.common['Authorization'];
       
       console.log('✅ Logout successful');
       return { success: true, message: 'Logout successful' };
@@ -430,13 +210,20 @@ const authAPI = {
   
   getToken: () => {
     return localStorage.getItem('adminToken') || sessionStorage.getItem('adminToken');
+  },
+
+  clearAuthData: () => {
+    localStorage.removeItem('adminToken');
+    localStorage.removeItem('adminUser');
+    sessionStorage.removeItem('adminToken');
+    sessionStorage.removeItem('adminUser');
   }
 };
 
 // ==========================================
 // 📝 BLOG MANAGEMENT API (for admin panel)
 // ==========================================
-const blogsAPI = {
+export const blogsAPI = {
   // Get all blogs for admin
   getAdminBlogs: async () => {
     try {
@@ -521,7 +308,7 @@ const blogsAPI = {
 // ==========================================
 // 📊 DASHBOARD API (for admin panel)
 // ==========================================
-const dashboardAPI = {
+export const dashboardAPI = {
   getStats: async () => {
     try {
       console.log('📊 Fetching dashboard statistics...');
@@ -537,23 +324,19 @@ const dashboardAPI = {
     } catch (error) {
       console.error('❌ Failed to fetch dashboard stats:', error);
       
-      // Return fallback data for development
-      if (isDevelopment) {
-        return {
-          success: true,
-          data: {
-            totalBlogs: 12,
-            totalProjects: 8,
-            totalMessages: 24,
-            totalUsers: 3,
-            monthlyVisitors: 1542,
-            revenue: 28500,
-            performance: 87.5
-          }
-        };
-      }
-      
-      throw error;
+      // Return fallback data
+      return {
+        success: true,
+        data: {
+          totalBlogs: 12,
+          totalProjects: 8,
+          totalMessages: 24,
+          totalUsers: 3,
+          monthlyVisitors: 1542,
+          revenue: 28500,
+          performance: 87.5
+        }
+      };
     }
   }
 };
@@ -561,7 +344,7 @@ const dashboardAPI = {
 // ==========================================
 // 🚀 PROJECTS API (for admin panel)
 // ==========================================
-const projectsAPI = {
+export const projectsAPI = {
   getAdminProjects: async () => {
     try {
       console.log('🔐 Fetching admin projects...');
@@ -640,72 +423,36 @@ const projectsAPI = {
 };
 
 // ==========================================
-// 🛠️ UTILITY FUNCTIONS
+// 🏥 HEALTH CHECK API
 // ==========================================
-const getAppUrls = () => ({
-  api: apiConfig.baseURL.replace('/api', ''),
-  environment: process.env.NODE_ENV,
-  isDevelopment,
-  isProduction
-});
-
-// Alias for backward compatibility
-const blogAPI = blogsAPI;
-const projectAPI = projectsAPI;
-
-// ==========================================
-// 🚀 INITIALIZATION
-// ==========================================
-console.log('🚀 ZMO API Service Initialized -', {
-  environment: process.env.NODE_ENV,
-  baseURL: apiConfig.baseURL
-});
-
-// Initialize auth token if exists
-const initialToken = authAPI.getToken();
-if (initialToken) {
-  api.defaults.headers.common['Authorization'] = `Bearer ${initialToken}`;
-}
-
-// Test backend connection on app start
-if (isDevelopment) {
-  setTimeout(() => {
-    publicAPI.testConnection().then(result => {
-      if (result.success) {
-        console.log('✅ Backend connection verified');
-      } else {
-        console.log('⚠️ Backend connection issue:', result.message);
-      }
-    });
-  }, 1000);
-}
-
-// ==========================================
-// 📦 EXPORTS (ALL EXPORTS INCLUDED)
-// ==========================================
-export {
-  // Public API (frontend website)
-  publicAPI,
-  
-  // Authentication
-  authAPI,
-  
-  // Blog management
-  blogsAPI,
-  blogAPI, // Alias for backward compatibility
-  
-  // Project management  
-  projectsAPI,
-  projectAPI, // Alias for backward compatibility
-  
-  // Dashboard
-  dashboardAPI,
-  
-  // Utilities
-  getAppUrls,
-  
-  // Individual functions for specific use cases
-  showToast
+export const healthAPI = {
+  check: async () => {
+    try {
+      console.log('🏥 Checking backend health...');
+      const response = await api.get('/health');
+      return { 
+        success: true, 
+        data: response.data, 
+        message: 'Backend is healthy and responsive'
+      };
+    } catch (error) {
+      console.error('❌ Health check failed:', error.message);
+      return { 
+        success: false, 
+        error: error.message, 
+        message: 'Backend health check failed'
+      };
+    }
+  }
 };
+
+// ==========================================
+// 📦 EXPORTS
+// ==========================================
+// Export for backward compatibility
+export const getBlogs = publicAPI.getBlogs;
+export const getBlogById = publicAPI.getBlogById;
+export const blogAPI = blogsAPI;
+export const projectAPI = projectsAPI;
 
 export default api;

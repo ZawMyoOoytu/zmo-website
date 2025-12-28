@@ -169,6 +169,12 @@
         box-shadow: 0 4px 6px rgba(0,0,0,0.05);
         display: flex;
         align-items: center;
+        transition: transform 0.2s, box-shadow 0.2s;
+      }
+      
+      .stat-card:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 6px 12px rgba(0,0,0,0.1);
       }
       
       .stat-icon {
@@ -266,6 +272,11 @@
       
       .btn-outline:hover {
         background-color: #f8f9fa;
+      }
+      
+      .btn:disabled {
+        opacity: 0.6;
+        cursor: not-allowed;
       }
       
       /* Filters */
@@ -501,6 +512,16 @@
         color: var(--success);
       }
       
+      .debug-status.error {
+        background-color: rgba(247, 37, 133, 0.1);
+        color: var(--warning);
+      }
+      
+      .debug-status.loading {
+        background-color: rgba(255, 193, 7, 0.1);
+        color: #ffc107;
+      }
+      
       .debug-content {
         background-color: white;
         border-radius: 5px;
@@ -616,6 +637,19 @@
         font-size: 0.9rem;
       }
       
+      .form-group input:focus, .form-group select:focus {
+        outline: none;
+        border-color: var(--primary);
+        box-shadow: 0 0 0 2px rgba(67, 97, 238, 0.2);
+      }
+      
+      .form-error {
+        color: var(--warning);
+        font-size: 0.8rem;
+        margin-top: 5px;
+        display: none;
+      }
+      
       /* Users Section */
       .user-card {
         background: white;
@@ -653,6 +687,37 @@
         color: var(--gray);
         font-size: 0.9rem;
         margin-bottom: 5px;
+      }
+      
+      /* Toast Notifications */
+      .toast {
+        position: fixed;
+        top: 20px;
+        right: 20px;
+        padding: 15px 20px;
+        border-radius: 5px;
+        color: white;
+        font-weight: 500;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+        z-index: 1100;
+        transform: translateX(150%);
+        transition: transform 0.3s ease;
+      }
+      
+      .toast.show {
+        transform: translateX(0);
+      }
+      
+      .toast.success {
+        background-color: var(--success);
+      }
+      
+      .toast.error {
+        background-color: var(--warning);
+      }
+      
+      .toast.info {
+        background-color: var(--primary);
       }
       
       /* Responsive */
@@ -705,11 +770,55 @@
         .analytics-grid, .settings-grid {
           grid-template-columns: 1fr;
         }
+        
+        .debug-actions {
+          flex-wrap: wrap;
+        }
+        
+        .top-bar {
+          flex-direction: column;
+          align-items: flex-start;
+          gap: 15px;
+        }
+        
+        .user-info {
+          width: 100%;
+          justify-content: flex-end;
+        }
+      }
+      
+      @media (max-width: 576px) {
+        .main-content {
+          padding: 15px;
+        }
+        
+        .section-header {
+          flex-direction: column;
+          align-items: flex-start;
+          gap: 15px;
+        }
+        
+        .actions {
+          flex-wrap: wrap;
+        }
+        
+        .user-card {
+          flex-direction: column;
+          text-align: center;
+        }
+        
+        .user-avatar-large {
+          margin-right: 0;
+          margin-bottom: 15px;
+        }
       }
     </style>
   </head>
   <body>
     <noscript>You need to enable JavaScript to run this app.</noscript>
+    
+    <!-- Toast Notifications -->
+    <div id="toastContainer"></div>
     
     <!-- Sidebar -->
     <div class="sidebar">
@@ -718,27 +827,27 @@
         <h2>Admin Panel</h2>
       </div>
       <div class="sidebar-menu">
-        <button class="menu-item active" data-section="dashboard">
+        <button class="menu-item active" data-section="dashboard" aria-label="Dashboard">
           <i class="fas fa-tachometer-alt"></i>
           <span>Dashboard</span>
         </button>
-        <button class="menu-item" data-section="blog-management">
+        <button class="menu-item" data-section="blog-management" aria-label="Blog Management">
           <i class="fas fa-blog"></i>
           <span>Blog Management</span>
         </button>
-        <button class="menu-item" data-section="project-management">
+        <button class="menu-item" data-section="project-management" aria-label="Project Management">
           <i class="fas fa-project-diagram"></i>
           <span>Project Management</span>
         </button>
-        <button class="menu-item" data-section="analytics">
+        <button class="menu-item" data-section="analytics" aria-label="Analytics">
           <i class="fas fa-chart-bar"></i>
           <span>Analytics</span>
         </button>
-        <button class="menu-item" data-section="settings">
+        <button class="menu-item" data-section="settings" aria-label="Settings">
           <i class="fas fa-cog"></i>
           <span>Settings</span>
         </button>
-        <button class="menu-item" data-section="users">
+        <button class="menu-item" data-section="users" aria-label="User Management">
           <i class="fas fa-user"></i>
           <span>Users</span>
         </button>
@@ -1164,30 +1273,32 @@
           <div class="settings-card">
             <h3>General Settings</h3>
             <div class="form-group">
-              <label>Site Title</label>
-              <input type="text" value="My Admin Dashboard">
+              <label for="siteTitle">Site Title</label>
+              <input type="text" id="siteTitle" value="My Admin Dashboard">
+              <div class="form-error" id="siteTitleError"></div>
             </div>
             <div class="form-group">
-              <label>Timezone</label>
-              <select>
+              <label for="timezone">Timezone</label>
+              <select id="timezone">
                 <option>UTC-5 (Eastern Time)</option>
                 <option>UTC-8 (Pacific Time)</option>
               </select>
             </div>
-            <button class="btn btn-primary">Save Changes</button>
+            <button class="btn btn-primary" id="saveGeneralSettings">Save Changes</button>
           </div>
           
           <div class="settings-card">
             <h3>Blog Settings</h3>
             <div class="form-group">
-              <label>Posts Per Page</label>
-              <input type="number" value="10">
+              <label for="postsPerPage">Posts Per Page</label>
+              <input type="number" id="postsPerPage" value="10" min="1" max="100">
+              <div class="form-error" id="postsPerPageError"></div>
             </div>
             <div class="form-group">
-              <label>Default Author</label>
-              <input type="text" value="Admin User">
+              <label for="defaultAuthor">Default Author</label>
+              <input type="text" id="defaultAuthor" value="Admin User">
             </div>
-            <button class="btn btn-primary">Save Changes</button>
+            <button class="btn btn-primary" id="saveBlogSettings">Save Changes</button>
           </div>
         </div>
       </div>
@@ -1244,6 +1355,28 @@
     <script>
       // Dashboard functionality
       document.addEventListener('DOMContentLoaded', function() {
+        // Toast notification system
+        function showToast(message, type = 'info', duration = 5000) {
+          const toastContainer = document.getElementById('toastContainer');
+          const toast = document.createElement('div');
+          toast.className = `toast ${type}`;
+          toast.textContent = message;
+          toastContainer.appendChild(toast);
+          
+          // Trigger animation
+          setTimeout(() => toast.classList.add('show'), 10);
+          
+          // Auto remove after duration
+          setTimeout(() => {
+            toast.classList.remove('show');
+            setTimeout(() => {
+              if (toast.parentNode) {
+                toast.parentNode.removeChild(toast);
+              }
+            }, 300);
+          }, duration);
+        }
+        
         // Sidebar navigation
         const menuItems = document.querySelectorAll('.menu-item');
         const dashboardSections = document.querySelectorAll('.dashboard-section');
@@ -1329,7 +1462,7 @@
           btn.addEventListener('click', function() {
             const row = this.closest('tr');
             const title = row.querySelector('.blog-title, .project-title')?.textContent || 'Item';
-            alert(`Edit functionality would open editor for: ${title}`);
+            showToast(`Edit functionality would open editor for: ${title}`, 'info');
           });
         });
         
@@ -1343,6 +1476,7 @@
               setTimeout(() => {
                 row.remove();
                 updateStats();
+                showToast(`"${title}" has been deleted`, 'success');
               }, 500);
             }
           });
@@ -1352,14 +1486,79 @@
         const createBlogBtn = document.getElementById('createBlogBtn');
         if (createBlogBtn) {
           createBlogBtn.addEventListener('click', function() {
-            alert('Create New Blog functionality would open a blog editor form');
+            showToast('Create New Blog functionality would open a blog editor form', 'info');
           });
         }
         
         const createProjectBtn = document.getElementById('createProjectBtn');
         if (createProjectBtn) {
           createProjectBtn.addEventListener('click', function() {
-            alert('Create New Project functionality would open a project creation form');
+            showToast('Create New Project functionality would open a project creation form', 'info');
+          });
+        }
+        
+        // Settings form validation and submission
+        const saveGeneralSettingsBtn = document.getElementById('saveGeneralSettings');
+        if (saveGeneralSettingsBtn) {
+          saveGeneralSettingsBtn.addEventListener('click', function() {
+            const siteTitle = document.getElementById('siteTitle');
+            const siteTitleError = document.getElementById('siteTitleError');
+            
+            // Reset errors
+            siteTitleError.style.display = 'none';
+            
+            // Validate
+            let isValid = true;
+            
+            if (!siteTitle.value.trim()) {
+              siteTitleError.textContent = 'Site title is required';
+              siteTitleError.style.display = 'block';
+              isValid = false;
+            }
+            
+            if (isValid) {
+              // Simulate saving
+              this.disabled = true;
+              this.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Saving...';
+              
+              setTimeout(() => {
+                this.disabled = false;
+                this.innerHTML = 'Save Changes';
+                showToast('General settings saved successfully', 'success');
+              }, 1500);
+            }
+          });
+        }
+        
+        const saveBlogSettingsBtn = document.getElementById('saveBlogSettings');
+        if (saveBlogSettingsBtn) {
+          saveBlogSettingsBtn.addEventListener('click', function() {
+            const postsPerPage = document.getElementById('postsPerPage');
+            const postsPerPageError = document.getElementById('postsPerPageError');
+            
+            // Reset errors
+            postsPerPageError.style.display = 'none';
+            
+            // Validate
+            let isValid = true;
+            
+            if (!postsPerPage.value || postsPerPage.value < 1 || postsPerPage.value > 100) {
+              postsPerPageError.textContent = 'Posts per page must be between 1 and 100';
+              postsPerPageError.style.display = 'block';
+              isValid = false;
+            }
+            
+            if (isValid) {
+              // Simulate saving
+              this.disabled = true;
+              this.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Saving...';
+              
+              setTimeout(() => {
+                this.disabled = false;
+                this.innerHTML = 'Save Changes';
+                showToast('Blog settings saved successfully', 'success');
+              }, 1500);
+            }
           });
         }
         
@@ -1368,12 +1567,26 @@
         if (testApiBtn) {
           testApiBtn.addEventListener('click', function() {
             const status = document.getElementById('debugStatus');
-            status.innerHTML = '<i class="fas fa-sync-alt fa-spin"></i> Testing Blog API...';
+            const debugContent = document.getElementById('debugContent');
             
+            status.innerHTML = '<i class="fas fa-sync-alt fa-spin"></i> Testing Blog API...';
+            status.className = 'debug-status loading';
+            
+            // Simulate API call
             setTimeout(() => {
               status.innerHTML = '<i class="fas fa-check-circle"></i> Status: Blog API test completed! Check console for details.';
               status.className = 'debug-status success';
+              debugContent.textContent = JSON.stringify({
+                status: 'success',
+                message: 'Blog API is working correctly',
+                data: {
+                  totalPosts: 7,
+                  published: 5,
+                  drafts: 2
+                }
+              }, null, 2);
               console.log('Blog API test completed successfully');
+              showToast('Blog API test completed successfully', 'success');
             }, 1500);
           });
         }
@@ -1382,12 +1595,27 @@
         if (testProjectsApiBtn) {
           testProjectsApiBtn.addEventListener('click', function() {
             const status = document.getElementById('debugStatus');
-            status.innerHTML = '<i class="fas fa-sync-alt fa-spin"></i> Testing Projects API...';
+            const debugContent = document.getElementById('debugContent');
             
+            status.innerHTML = '<i class="fas fa-sync-alt fa-spin"></i> Testing Projects API...';
+            status.className = 'debug-status loading';
+            
+            // Simulate API call
             setTimeout(() => {
               status.innerHTML = '<i class="fas fa-check-circle"></i> Status: Projects API test completed! Check console for details.';
               status.className = 'debug-status success';
+              debugContent.textContent = JSON.stringify({
+                status: 'success',
+                message: 'Projects API is working correctly',
+                data: {
+                  totalProjects: 4,
+                  inProgress: 2,
+                  completed: 1,
+                  pending: 1
+                }
+              }, null, 2);
               console.log('Projects API test completed successfully');
+              showToast('Projects API test completed successfully', 'success');
             }, 1500);
           });
         }
@@ -1395,7 +1623,7 @@
         const createTestBlogBtn = document.getElementById('createTestBlogBtn');
         if (createTestBlogBtn) {
           createTestBlogBtn.addEventListener('click', function() {
-            alert('Test blog would be created via API call');
+            showToast('Test blog would be created via API call', 'info');
           });
         }
         
@@ -1471,6 +1699,11 @@
           // This function would update statistics when items are deleted
           console.log('Stats updated');
         }
+        
+        // Initialize with a welcome message
+        setTimeout(() => {
+          showToast('Welcome to Admin Dashboard!', 'success', 3000);
+        }, 500);
       });
     </script>
   </body>

@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import BlogForm from '../components/forms/BlogForm';
 import Table from '../components/common/Table';
 import SearchBar from '../components/common/SearchBar';
@@ -13,13 +14,16 @@ const BlogManagement = () => {
   const [editingBlog, setEditingBlog] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
+  
+  const navigate = useNavigate();
 
-  // Debug state changes
+  // Enhanced debug logging
   useEffect(() => {
     console.log('🔍 BLOG MANAGEMENT DEBUG:');
     console.log('   showForm:', showForm);
-    console.log('   editingBlog:', editingBlog);
-  }, [showForm, editingBlog]);
+    console.log('   editingBlog:', editingBlog ? editingBlog._id : 'null');
+    console.log('   blogs count:', blogs.length);
+  }, [showForm, editingBlog, blogs.length]);
 
   useEffect(() => {
     fetchBlogs();
@@ -29,11 +33,18 @@ const BlogManagement = () => {
     try {
       setLoading(true);
       const response = await blogService.getBlogs();
+      console.log('📡 Fetch Blogs Response:', response);
+      
       if (response.success) {
-        setBlogs(response.data);
+        setBlogs(response.data || []);
+        console.log(`✅ Loaded ${response.data?.length || 0} blogs`);
+      } else {
+        console.error('❌ Failed to fetch blogs:', response.error);
+        setBlogs([]);
       }
     } catch (error) {
-      console.error('Error fetching blogs:', error);
+      console.error('💥 Error fetching blogs:', error);
+      setBlogs([]);
     } finally {
       setLoading(false);
     }
@@ -44,22 +55,27 @@ const BlogManagement = () => {
       console.log('📝 Creating blog:', blogData);
       const response = await blogService.createBlog(blogData);
       
+      console.log('📝 Create Response:', response);
+      
       if (response.success) {
         setBlogs(prev => [response.data, ...prev]);
         setShowForm(false);
-        alert('Blog created successfully!');
+        alert('✅ Blog created successfully!');
       } else {
-        alert('Error creating blog: ' + response.error);
+        alert('❌ Error creating blog: ' + (response.error || 'Unknown error'));
       }
     } catch (error) {
-      console.error('Error creating blog:', error);
-      alert('Error creating blog: ' + error.message);
+      console.error('💥 Error creating blog:', error);
+      alert('❌ Error creating blog: ' + error.message);
     }
   };
 
   const handleEditBlog = async (blogData) => {
     try {
+      console.log('✏️ Updating blog:', editingBlog._id, blogData);
       const response = await blogService.updateBlog(editingBlog._id, blogData);
+      
+      console.log('✏️ Update Response:', response);
       
       if (response.success) {
         setBlogs(prev => prev.map(blog => 
@@ -67,13 +83,13 @@ const BlogManagement = () => {
         ));
         setShowForm(false);
         setEditingBlog(null);
-        alert('Blog updated successfully!');
+        alert('✅ Blog updated successfully!');
       } else {
-        alert('Error updating blog: ' + response.error);
+        alert('❌ Error updating blog: ' + (response.error || 'Unknown error'));
       }
     } catch (error) {
-      console.error('Error updating blog:', error);
-      alert('Error updating blog: ' + error.message);
+      console.error('💥 Error updating blog:', error);
+      alert('❌ Error updating blog: ' + error.message);
     }
   };
 
@@ -83,7 +99,9 @@ const BlogManagement = () => {
         const response = await blogService.deleteBlog(blogId);
         if (response.success) {
           setBlogs(prev => prev.filter(blog => blog._id !== blogId));
-          alert('Blog deleted successfully!');
+          alert('✅ Blog deleted successfully!');
+        } else {
+          alert('❌ Error deleting blog: ' + (response.error || 'Unknown error'));
         }
       } catch (error) {
         console.error('Error deleting blog:', error);
@@ -93,13 +111,45 @@ const BlogManagement = () => {
   };
 
   const handleEditClick = (blog) => {
+    console.log('✏️ Edit button clicked for blog:', blog._id);
     setEditingBlog(blog);
     setShowForm(true);
+    // Prevent body scroll when modal is open
+    document.body.style.overflow = 'hidden';
+  };
+
+  const handleCreateClick = () => {
+    console.log('➕ Create button clicked');
+    setEditingBlog(null); // Clear any existing edit data
+    setShowForm(true);
+    document.body.style.overflow = 'hidden'; // Prevent body scroll
+  };
+
+  const handleCancelForm = () => {
+    console.log('❌ Cancelling form');
+    const confirmCancel = window.confirm('Are you sure you want to cancel? Unsaved changes will be lost.');
+    if (confirmCancel) {
+      setShowForm(false);
+      setEditingBlog(null);
+      document.body.style.overflow = 'auto'; // Restore body scroll
+    }
+  };
+
+  const handleBackdropClick = (e) => {
+    if (e.target.classList.contains('modal-backdrop')) {
+      console.log('🔙 Backdrop clicked');
+      handleCancelForm();
+    }
+  };
+
+  const navigateToCreatePage = () => {
+    console.log('🚀 Navigating to create page');
+    navigate('/admin/blogs/create');
   };
 
   const filteredBlogs = blogs.filter(blog => {
-    const matchesSearch = blog.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         blog.excerpt.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    const matchesSearch = blog.title?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         blog.excerpt?.toLowerCase().includes(searchTerm.toLowerCase()) ||
                          (blog.tags && blog.tags.some(tag => tag.toLowerCase().includes(searchTerm.toLowerCase())));
     
     const matchesStatus = statusFilter === 'all' || blog.status === statusFilter;
@@ -118,23 +168,28 @@ const BlogManagement = () => {
   const tableData = filteredBlogs.map(blog => ({
     ...blog,
     title: (
-      <div>
-        <div className="blog-title">{blog.title}</div>
-        <div className="blog-tags">
-          {blog.tags && blog.tags.map(tag => (
-            <span key={tag} className="tag">{tag}</span>
-          ))}
-        </div>
+      <div className="blog-title-cell">
+        <div className="blog-title">{blog.title || 'Untitled'}</div>
+        {blog.tags && blog.tags.length > 0 && (
+          <div className="blog-tags">
+            {blog.tags.slice(0, 3).map(tag => (
+              <span key={tag} className="tag">{tag}</span>
+            ))}
+            {blog.tags.length > 3 && (
+              <span className="tag-more">+{blog.tags.length - 3} more</span>
+            )}
+          </div>
+        )}
       </div>
     ),
     status: (
-      <span className={`status ${blog.status}`}>
+      <span className={`status status-${blog.status || 'draft'}`}>
         {blog.status ? blog.status.charAt(0).toUpperCase() + blog.status.slice(1) : 'Draft'}
       </span>
     ),
-    createdAt: new Date(blog.createdAt).toLocaleDateString(),
+    createdAt: blog.createdAt ? new Date(blog.createdAt).toLocaleDateString() : 'Unknown',
     actions: (
-      <div className="actions">
+      <div className="action-buttons">
         <button 
           className="action-btn edit" 
           onClick={() => handleEditClick(blog)}
@@ -149,47 +204,54 @@ const BlogManagement = () => {
         >
           <i className="fas fa-trash"></i>
         </button>
+        {blog.status === 'published' && (
+          <button 
+            className="action-btn view" 
+            onClick={() => window.open(`/blog/${blog._id}`, '_blank')}
+            title="View"
+          >
+            <i className="fas fa-external-link-alt"></i>
+          </button>
+        )}
       </div>
     )
   }));
 
-  if (loading) {
+  if (loading && blogs.length === 0) {
     return <LoadingSpinner />;
   }
 
   return (
     <div className="blog-management">
       <div className="page-header">
-        <h1>Blog Management</h1>
-        <div>
+        <h1>📝 Blog Management</h1>
+        <div className="header-actions">
           <button 
             className="btn btn-primary"
-            onClick={() => {
-              console.log('🔄 Create button clicked - setting showForm to true');
-              setShowForm(true);
-            }}
+            onClick={handleCreateClick}
           >
             <i className="fas fa-plus"></i> Create New Blog Post
           </button>
           
-          {/* Debug Button */}
+          <button 
+            className="btn btn-secondary"
+            onClick={navigateToCreatePage}
+          >
+            <i className="fas fa-external-link-alt"></i> Open in New Page
+          </button>
+          
           <button 
             onClick={() => {
-              console.log('🐛 DEBUG: Current showForm =', showForm);
-              console.log('🐛 DEBUG: Setting showForm to true');
-              setShowForm(true);
+              console.log('🐛 DEBUG:', {
+                showForm,
+                editingBlog: editingBlog?._id || 'null',
+                blogsCount: blogs.length,
+                filteredCount: filteredBlogs.length
+              });
             }}
-            style={{
-              marginLeft: '10px',
-              padding: '10px',
-              background: '#ffc107',
-              color: 'black',
-              border: 'none',
-              borderRadius: '4px',
-              fontWeight: 'bold'
-            }}
+            className="btn btn-debug"
           >
-            🐛 Debug ShowForm
+            🐛 Debug Info
           </button>
         </div>
       </div>
@@ -221,62 +283,74 @@ const BlogManagement = () => {
             >
               Drafts ({blogs.filter(b => b.status === 'draft').length})
             </button>
+            <button 
+              className={`filter-tab ${statusFilter === 'archived' ? 'active' : ''}`}
+              onClick={() => setStatusFilter('archived')}
+            >
+              Archived ({blogs.filter(b => b.status === 'archived').length})
+            </button>
           </div>
         </div>
 
         <Table 
           columns={tableColumns}
           data={tableData}
-          emptyMessage="No blog posts found. Create your first blog post!"
+          emptyMessage={
+            <div className="empty-state">
+              <p>No blog posts found.</p>
+              {searchTerm ? (
+                <button 
+                  className="btn btn-secondary"
+                  onClick={() => setSearchTerm('')}
+                >
+                  Clear Search
+                </button>
+              ) : (
+                <button 
+                  className="btn btn-primary"
+                  onClick={handleCreateClick}
+                >
+                  Create Your First Blog
+                </button>
+              )}
+            </div>
+          }
         />
       </div>
 
-      {/* Blog Form Modal - WORKING VERSION */}
+      {/* Blog Form Modal - FIXED VERSION */}
       {showForm && (
         <>
-          {/* Backdrop */}
           <div 
-            style={{
-              position: 'fixed',
-              top: 0,
-              left: 0,
-              right: 0,
-              bottom: 0,
-              background: 'rgba(0, 0, 0, 0.7)',
-              zIndex: 9999
-            }}
-            onClick={() => {
-              console.log('🔙 Backdrop clicked - closing form');
-              setShowForm(false);
-              setEditingBlog(null);
-            }}
+            className="modal-backdrop"
+            onClick={handleBackdropClick}
           />
           
-          {/* Form */}
-          <div style={{
-            position: 'fixed',
-            top: '50%',
-            left: '50%',
-            transform: 'translate(-50%, -50%)',
-            background: 'white',
-            padding: '20px',
-            borderRadius: '12px',
-            boxShadow: '0 10px 30px rgba(0,0,0,0.3)',
-            zIndex: 10000,
-            width: '90%',
-            maxWidth: '800px',
-            maxHeight: '90vh',
-            overflow: 'auto'
-          }}>
-            <BlogForm
-              blog={editingBlog}
-              onSubmit={editingBlog ? handleEditBlog : handleCreateBlog}
-              onCancel={() => {
-                console.log('❌ Cancel button clicked');
-                setShowForm(false);
-                setEditingBlog(null);
-              }}
-            />
+          <div className="modal-container" role="dialog" aria-modal="true">
+            <button 
+              className="modal-close-btn"
+              onClick={handleCancelForm}
+              aria-label="Close modal"
+            >
+              ✕
+            </button>
+            
+            <div className="modal-header">
+              <h2>{editingBlog ? 'Edit Blog Post' : 'Create New Blog Post'}</h2>
+              <p className="modal-subtitle">
+                {editingBlog ? 'Update your blog post details' : 'Fill in the details to create a new blog post'}
+              </p>
+            </div>
+            
+            <div className="modal-content">
+              <BlogForm
+                key={editingBlog?._id || 'create'} // Force re-render when switching between create/edit
+                blog={editingBlog}
+                onSubmit={editingBlog ? handleEditBlog : handleCreateBlog}
+                onCancel={handleCancelForm}
+                loading={false}
+              />
+            </div>
           </div>
         </>
       )}

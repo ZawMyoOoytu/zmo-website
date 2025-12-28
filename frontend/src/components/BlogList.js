@@ -1,4 +1,4 @@
-// frontend/src/components/BlogList.js - ENHANCED DEBUG VERSION
+// frontend/src/components/BlogList.js - COMPLETE FIXED VERSION
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { publicAPI } from '../services/api';
@@ -24,44 +24,43 @@ const BlogList = () => {
         const result = await publicAPI.getBlogs();
         console.log('🔍 Frontend API Response:', result);
         
-        setDebugInfo(`✅ API Response Received - Success: ${result.success}`);
+        setDebugInfo(`✅ API Response Received - Success: ${result ? result.success : 'false'}`);
         
         let blogsArray = [];
         
-        // Enhanced response structure handling
-        if (result && result.success) {
-          if (Array.isArray(result.data)) {
-            blogsArray = result.data;
-            console.log(`✅ Found ${result.data.length} blogs in result.data`);
-          } else if (Array.isArray(result.blogs)) {
-            blogsArray = result.blogs;
-            console.log(`✅ Found ${result.blogs.length} blogs in result.blogs`);
-          } else {
-            console.warn('⚠️ Unexpected successful response structure:', result);
-            setDebugInfo('⚠️ Success but unexpected data structure');
-          }
-        } else if (result && Array.isArray(result.data)) {
-          // Handle case where success might be missing but data exists
+        // FIXED RESPONSE HANDLING:
+        console.log('🔍 Raw API Response:', result);
+
+        if (result && result.success === true && Array.isArray(result.data)) {
           blogsArray = result.data;
-          console.log(`✅ Found ${result.data.length} blogs (success field missing)`);
-        } else if (Array.isArray(result)) {
-          // Handle case where response is directly the array
-          blogsArray = result;
-          console.log(`✅ Found ${result.length} blogs (direct array response)`);
+          console.log(`✅ Found ${blogsArray.length} blogs in result.data`);
+        } else if (result && Array.isArray(result.data)) {
+          blogsArray = result.data;
+          console.log(`✅ Found ${blogsArray.length} blogs (success field may be missing)`);
         } else {
           console.warn('⚠️ Unexpected response format:', result);
-          setError('Unexpected data format from server');
+          setError('Unexpected data format from server: ' + JSON.stringify(result));
           setDebugInfo('❌ Unexpected response format');
+          blogsArray = []; // Ensure it's always an array
         }
 
         // Debug: Log what we received
         console.log('📊 Raw blogs array:', blogsArray);
-        console.log('🔍 First blog sample:', blogsArray[0]);
+        
+        if (blogsArray.length > 0) {
+          console.log('🔍 First blog sample:', blogsArray[0]);
+        }
 
-        // Filter only published blogs with enhanced logic
+        // FIXED PUBLISHED FILTER:
         const publishedBlogs = blogsArray.filter(blog => {
-          const isPublished = blog.published !== false && blog.published !== 'false';
-          console.log(`📝 Blog "${blog.title}" - published: ${blog.published}, isPublished: ${isPublished}`);
+          // Handle both boolean and string values for published field
+          // Also check status field for 'published'
+          const isPublished = 
+            blog.published === true || 
+            blog.published === 'true' || 
+            blog.status === 'published';
+          
+          console.log(`📝 Blog "${blog.title}" - published: ${blog.published}, status: ${blog.status}, isPublished: ${isPublished}`);
           return isPublished;
         });
         
@@ -72,12 +71,16 @@ const BlogList = () => {
         setFilteredBlogs(publishedBlogs);
         
         // If no blogs found, log detailed info
-        if (publishedBlogs.length === 0) {
-          console.warn('❌ No published blogs found. Possible issues:');
-          console.warn('- All blogs might be unpublished (published: false)');
-          console.warn('- Backend might be returning empty array');
-          console.warn('- API endpoint might have no data');
+        if (publishedBlogs.length === 0 && blogsArray.length > 0) {
+          console.warn('❌ No published blogs found. All blogs:', blogsArray);
+          console.warn('- Check if blogs have published: true or status: "published"');
           setDebugInfo(prev => prev + ' - ⚠️ No published blogs found');
+          
+          // TEMPORARY: Show all blogs for debugging
+          console.log('🔧 TEMPORARY: Showing all blogs including drafts for debugging');
+          setBlogs(blogsArray);
+          setFilteredBlogs(blogsArray);
+          setDebugInfo(`📊 Showing ALL ${blogsArray.length} blogs (including drafts)`);
         }
         
       } catch (error) {
@@ -100,11 +103,11 @@ const BlogList = () => {
       setFilteredBlogs(blogs);
     } else {
       const filtered = blogs.filter(blog =>
-        blog.title?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        blog.excerpt?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        blog.content?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        blog.tags?.some(tag => tag.toLowerCase().includes(searchTerm.toLowerCase())) ||
-        blog.author?.toLowerCase().includes(searchTerm.toLowerCase())
+        (blog.title && blog.title.toLowerCase().includes(searchTerm.toLowerCase())) ||
+        (blog.excerpt && blog.excerpt.toLowerCase().includes(searchTerm.toLowerCase())) ||
+        (blog.content && blog.content.toLowerCase().includes(searchTerm.toLowerCase())) ||
+        (blog.tags && blog.tags.some(tag => tag.toLowerCase().includes(searchTerm.toLowerCase()))) ||
+        (blog.author && blog.author.toLowerCase().includes(searchTerm.toLowerCase()))
       );
       setFilteredBlogs(filtered);
     }
@@ -143,10 +146,31 @@ const BlogList = () => {
       const response = await fetch('https://zmo-backend.onrender.com/api/blogs');
       const data = await response.json();
       console.log('🔍 Direct API Test Result:', data);
-      setDebugInfo(`✅ Direct API Test - Status: ${response.status}, Blogs: ${data.data?.length}`);
+      setDebugInfo(`✅ Direct API Test - Status: ${response.status}, Blogs: ${data.data ? data.data.length : 0}`);
+      
+      // Show raw data in console for debugging
+      console.log('📋 Raw API Data for debugging:', data.data);
     } catch (error) {
       console.error('❌ Direct API Test Failed:', error);
       setDebugInfo(`❌ Direct API Test Failed: ${error.message}`);
+    }
+  };
+
+  // Show all blogs including drafts (for debugging)
+  const showAllBlogs = () => {
+    setDebugInfo('🔧 Showing all blogs including drafts');
+    // This will refetch and show all blogs
+    window.location.reload();
+  };
+
+  // Handle image error - FIXED VERSION
+  const handleImageError = (e) => {
+    console.warn('Image failed to load');
+    e.target.style.display = 'none';
+    // Show placeholder if image fails - FIXED SYNTAX
+    const nextSibling = e.target.nextSibling;
+    if (nextSibling && nextSibling.style) {
+      nextSibling.style.display = 'block';
     }
   };
 
@@ -203,7 +227,7 @@ const BlogList = () => {
                   <span style={{ marginLeft: '10px' }}>Filtered: {filteredBlogs.length}</span>
                 </div>
               </div>
-              <div style={{ display: 'flex', gap: '10px' }}>
+              <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
                 <button 
                   onClick={testAPI}
                   style={{ 
@@ -231,6 +255,20 @@ const BlogList = () => {
                   }}
                 >
                   Console Log
+                </button>
+                <button 
+                  onClick={showAllBlogs}
+                  style={{ 
+                    padding: '5px 10px', 
+                    background: '#fd7e14', 
+                    color: 'white', 
+                    border: 'none', 
+                    borderRadius: '4px',
+                    fontSize: '12px',
+                    cursor: 'pointer'
+                  }}
+                >
+                  Show All
                 </button>
                 <button 
                   onClick={handleRetry}
@@ -288,17 +326,17 @@ const BlogList = () => {
               <article key={blog._id} className="blog-card">
                 {/* Blog Image */}
                 <div className="blog-card-image">
-                  {blog.featuredImage || blog.image ? (
+                  {blog.image || blog.featuredImage ? (
                     <img 
-                      src={blog.featuredImage || blog.image} 
+                      src={blog.image || blog.featuredImage} 
                       alt={blog.title}
                       loading="lazy"
-                      onError={(e) => {
-                        console.warn('Image failed to load:', blog.featuredImage || blog.image);
-                        e.target.style.display = 'none';
-                      }}
+                      onError={handleImageError}
                     />
-                  ) : (
+                  ) : null}
+                  
+                  {/* Image placeholder - show if no image or image fails */}
+                  {(!blog.image && !blog.featuredImage) && (
                     <div className="image-placeholder">
                       <i className="fas fa-newspaper"></i>
                     </div>
@@ -321,6 +359,19 @@ const BlogList = () => {
                       <span className="blog-read-time">
                         <i className="fas fa-clock"></i>
                         {blog.readTime} min read
+                      </span>
+                    )}
+                    {/* Show status badge for debugging */}
+                    {(blog.published === false || blog.status === 'draft') && (
+                      <span className="blog-status" style={{ 
+                        background: '#ffc107', 
+                        color: '#000',
+                        padding: '2px 6px',
+                        borderRadius: '4px',
+                        fontSize: '10px',
+                        fontWeight: 'bold'
+                      }}>
+                        {blog.status || 'unpublished'}
                       </span>
                     )}
                   </div>
@@ -402,6 +453,7 @@ const BlogList = () => {
                 <li>Verify the backend API is returning data</li>
                 <li>Check browser console for detailed error messages</li>
                 <li>Try the "Test API" button above to verify backend connection</li>
+                <li>Click "Show All" to see draft/unpublished blogs</li>
               </ul>
             </div>
             
@@ -409,10 +461,13 @@ const BlogList = () => {
               <button onClick={testAPI} className="btn btn-outline" style={{ marginRight: '10px' }}>
                 <i className="fas fa-bug"></i> Test API
               </button>
-              <Link to="/admin" className="btn btn-outline">
+              <button onClick={showAllBlogs} className="btn btn-outline" style={{ marginRight: '10px' }}>
+                <i className="fas fa-eye"></i> Show All Blogs
+              </button>
+              <Link to="/admin" className="btn btn-outline" style={{ marginRight: '10px' }}>
                 <i className="fas fa-cog"></i> Admin Panel
               </Link>
-              <button onClick={handleRetry} className="btn btn-primary" style={{ marginLeft: '10px' }}>
+              <button onClick={handleRetry} className="btn btn-primary">
                 <i className="fas fa-redo"></i> Try Again
               </button>
             </div>

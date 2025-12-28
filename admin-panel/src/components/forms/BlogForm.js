@@ -1,16 +1,21 @@
 import React, { useState, useEffect } from 'react';
 import './BlogForm.css';
 
-const BlogForm = ({ blog, onSubmit, onCancel }) => {
+const BlogForm = ({ 
+  blog,           // For editing existing blog
+  initialData,    // For creating new blog (compatibility)
+  onSubmit, 
+  onCancel,
+  loading = false // Added loading prop for compatibility
+}) => {
   // Form states
   const [title, setTitle] = useState('');
   const [content, setContent] = useState('');
   const [imageUrl, setImageUrl] = useState('');
   // eslint-disable-next-line no-unused-vars
-  const [imageFile, setImageFile] = useState(null); // Fixed: marked as intentionally unused
+  const [imageFile, setImageFile] = useState(null);
   const [imagePreview, setImagePreview] = useState('');
   const [useImageUrl, setUseImageUrl] = useState(false);
-  const [loading, setLoading] = useState(false);
 
   // Additional fields
   const [excerpt, setExcerpt] = useState('');
@@ -22,21 +27,22 @@ const BlogForm = ({ blog, onSubmit, onCancel }) => {
   const [featured, setFeatured] = useState(false);
   const [errors, setErrors] = useState({});
 
-  // Initialize form with blog data if editing
+  // Initialize form with blog data if editing OR initialData if creating
   useEffect(() => {
-    if (blog) {
-      setTitle(blog.title || '');
-      setContent(blog.content || '');
-      setImageUrl(blog.imageUrl || '');
-      setImagePreview(blog.imageUrl || '');
-      setExcerpt(blog.excerpt || '');
-      setAuthor(blog.author || 'Admin User');
-      setReadTime(blog.readTime || 5);
-      setTags(blog.tags || []);
-      setStatus(blog.status || 'draft');
-      setFeatured(blog.featured || false);
+    const data = blog || initialData;
+    if (data) {
+      setTitle(data.title || '');
+      setContent(data.content || '');
+      setImageUrl(data.imageUrl || '');
+      setImagePreview(data.imageUrl || '');
+      setExcerpt(data.excerpt || '');
+      setAuthor(data.author || 'Admin User');
+      setReadTime(data.readTime || 5);
+      setTags(data.tags || []);
+      setStatus(data.status || 'draft');
+      setFeatured(data.featured || false);
     }
-  }, [blog]);
+  }, [blog, initialData]);
 
   // Character limit constants
   const CHAR_LIMITS = {
@@ -158,9 +164,6 @@ const BlogForm = ({ blog, onSubmit, onCancel }) => {
     }
     console.log('✅ Form validation passed');
 
-    setLoading(true);
-    console.log('⏳ Loading state set to true');
-
     try {
       // Prepare data for blogService
       const blogData = {
@@ -195,9 +198,6 @@ const BlogForm = ({ blog, onSubmit, onCancel }) => {
         ...prev, 
         submit: error.message || 'Failed to submit form. Please try again.' 
       }));
-    } finally {
-      setLoading(false);
-      console.log('🔚 Loading state set to false');
     }
   };
 
@@ -512,26 +512,6 @@ const BlogForm = ({ blog, onSubmit, onCancel }) => {
             {loading && <span className="blog-form__spinner"></span>}
             {blog ? 'Update Post' : status === 'published' ? 'Publish Now' : 'Save as Draft'}
           </button>
-        </div>
-
-        {/* DEBUG PANEL - Remove this after testing */}
-        <div style={{ 
-          padding: '15px', 
-          border: '2px dashed #4CAF50', 
-          margin: '20px 0',
-          background: '#f0f8f0',
-          borderRadius: '8px'
-        }}>
-          <h4 style={{ margin: '0 0 10px 0', color: '#4CAF50' }}>🐛 DEBUG INFO</h4>
-          <div style={{ fontSize: '12px', fontFamily: 'monospace' }}>
-            <div>Title: {title.length}/100</div>
-            <div>Excerpt: {excerpt.length}/200</div>
-            <div>Content: {content.length} chars</div>
-            <div>Validation: {validateForm() ? '✅ PASS' : '❌ FAIL'}</div>
-            <div>Loading: {loading ? '⏳ YES' : '✅ NO'}</div>
-            <div>Image Preview: {imagePreview ? '✅ SET' : '❌ NOT SET'}</div>
-            <div>Tags: {tags.length} tags</div>
-          </div>
         </div>
       </form>
     </div>
