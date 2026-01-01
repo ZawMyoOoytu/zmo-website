@@ -1,115 +1,396 @@
-/* === DASHBOARD CONTAINER === */
-.dashboard-wrapper {
-  padding: 40px;
-  background: #f8fafc;
-  min-height: calc(100vh - 80px); /* adjust if header height differs */
-  font-family: 'Inter', sans-serif;
+/* src/components/dashboard/Dashboard.css */
+.dashboard {
+  padding: 24px;
+  max-width: 1400px;
+  margin: 0 auto;
 }
 
-/* === STATS CARDS === */
-.dashboard-stats {
+.dashboard-header {
   display: flex;
-  gap: 25px;
   justify-content: space-between;
-  flex-wrap: wrap;
-  margin-bottom: 40px;
+  align-items: center;
+  margin-bottom: 32px;
+  padding-bottom: 20px;
+  border-bottom: 1px solid #e8e8e8;
+}
+
+.dashboard-header h1 {
+  margin: 0;
+  color: #333;
+  font-size: 28px;
+}
+
+.user-info {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  color: #666;
+  font-weight: 500;
+}
+
+.user-avatar {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: bold;
+}
+
+/* Stats Grid */
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  gap: 20px;
+  margin-bottom: 32px;
 }
 
 .stat-card {
-  flex: 1;
-  min-width: 200px;
-  background: #fff;
-  border-radius: 14px;
-  border-top: 4px solid transparent;
-  padding: 25px 20px;
-  box-shadow: 0 4px 10px rgba(0,0,0,0.06);
-  transition: all 0.2s ease-in-out;
+  background: white;
+  border-radius: 12px;
+  padding: 24px;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.05);
   display: flex;
   align-items: center;
-  gap: 15px;
+  gap: 20px;
+  transition: transform 0.2s, box-shadow 0.2s;
 }
 
 .stat-card:hover {
-  transform: translateY(-5px);
-  box-shadow: 0 8px 16px rgba(0,0,0,0.1);
+  transform: translateY(-4px);
+  box-shadow: 0 8px 24px rgba(0,0,0,0.1);
 }
 
 .stat-icon {
-  font-size: 30px;
-  background: rgba(59, 130, 246, 0.1);
-  padding: 12px;
-  border-radius: 10px;
-}
-
-.stat-info h3 {
-  font-size: 16px;
-  font-weight: 600;
-  color: #555;
-  margin: 0;
-}
-
-.stat-info p {
-  font-size: 32px;
-  font-weight: 700;
-  color: #111827;
-  margin-top: 4px;
-}
-
-/* === RECENT ACTIVITY === */
-.recent-activity-section {
-  background: #fff;
-  border-radius: 14px;
-  box-shadow: 0 4px 10px rgba(0,0,0,0.06);
-  padding: 25px 30px;
-}
-
-.recent-activity-section h2 {
-  margin-bottom: 20px;
-  font-size: 20px;
-  font-weight: 600;
-  color: #111827;
-}
-
-.activity-list {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-}
-
-.activity-list li {
+  width: 60px;
+  height: 60px;
+  border-radius: 12px;
   display: flex;
   align-items: center;
-  padding: 14px 0;
-  border-bottom: 1px solid #f0f0f0;
-  font-size: 15px;
-  color: #444;
+  justify-content: center;
+  font-size: 24px;
 }
 
-.activity-list li:last-child {
+.stat-icon.total {
+  background: rgba(67, 97, 238, 0.1);
+  color: #4361ee;
+}
+
+.stat-icon.published {
+  background: rgba(76, 201, 240, 0.1);
+  color: #4cc9f0;
+}
+
+.stat-icon.drafts {
+  background: rgba(247, 37, 133, 0.1);
+  color: #f72585;
+}
+
+.stat-icon.projects {
+  background: rgba(114, 9, 183, 0.1);
+  color: #7209b7;
+}
+
+.stat-content h3 {
+  margin: 0 0 8px 0;
+  font-size: 32px;
+  color: #333;
+}
+
+.stat-content p {
+  margin: 0;
+  color: #666;
+  font-size: 14px;
+}
+
+/* Quick Actions */
+.quick-actions {
+  margin-bottom: 32px;
+}
+
+.quick-actions h2 {
+  margin: 0 0 20px 0;
+  color: #333;
+  font-size: 20px;
+}
+
+.action-buttons {
+  display: flex;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.action-btn {
+  padding: 14px 24px;
+  border-radius: 8px;
+  text-decoration: none;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-weight: 500;
+  transition: all 0.2s;
+  border: none;
+  cursor: pointer;
+  font-size: 14px;
+}
+
+.action-btn.primary {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+}
+
+.action-btn.primary:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(102, 126, 234, 0.3);
+}
+
+.action-btn.secondary {
+  background: #f0f0f0;
+  color: #333;
+}
+
+.action-btn.secondary:hover {
+  background: #e0e0e0;
+  transform: translateY(-2px);
+}
+
+.action-btn.outline {
+  background: white;
+  color: #667eea;
+  border: 2px solid #667eea;
+}
+
+.action-btn.outline:hover {
+  background: #f8f9ff;
+  transform: translateY(-2px);
+}
+
+/* Recent Blogs */
+.recent-blogs {
+  background: white;
+  border-radius: 12px;
+  padding: 24px;
+  margin-bottom: 32px;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+}
+
+.section-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 24px;
+}
+
+.section-header h2 {
+  margin: 0;
+  color: #333;
+  font-size: 20px;
+}
+
+.view-all {
+  color: #667eea;
+  text-decoration: none;
+  font-weight: 500;
+  font-size: 14px;
+}
+
+.view-all:hover {
+  text-decoration: underline;
+}
+
+/* Blogs Table */
+.blogs-table {
+  overflow-x: auto;
+}
+
+.blogs-table table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.blogs-table th {
+  padding: 16px;
+  text-align: left;
+  font-weight: 600;
+  color: #666;
+  background: #fafafa;
+  border-bottom: 2px solid #f0f0f0;
+}
+
+.blogs-table td {
+  padding: 16px;
+  border-bottom: 1px solid #f0f0f0;
+}
+
+.blogs-table tr:last-child td {
   border-bottom: none;
 }
 
-.activity-icon {
-  font-size: 22px;
-  margin-right: 12px;
+.blog-title {
+  font-weight: 500;
+  color: #333;
 }
 
-.activity-text {
-  flex: 1;
+/* Status Button */
+.status-btn {
+  padding: 6px 16px;
+  border-radius: 20px;
+  border: none;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 500;
+  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  gap: 6px;
 }
 
-.activity-time {
-  font-size: 13px;
-  color: #9ca3af;
+.status-btn.published {
+  background: #f6ffed;
+  color: #52c41a;
+  border: 1px solid #b7eb8f;
 }
 
-/* === RESPONSIVE === */
+.status-btn.draft {
+  background: #fff7e6;
+  color: #fa8c16;
+  border: 1px solid #ffd591;
+}
+
+.status-btn:hover {
+  transform: scale(1.05);
+}
+
+.row-actions {
+  display: flex;
+  gap: 12px;
+}
+
+.action-link {
+  color: #667eea;
+  text-decoration: none;
+  font-size: 12px;
+  font-weight: 500;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0;
+}
+
+.action-link:hover {
+  text-decoration: underline;
+}
+
+.action-link.delete {
+  color: #ff4d4f;
+}
+
+/* Debug Section */
+.debug-section {
+  background: #f8f9fa;
+  border-radius: 12px;
+  padding: 20px;
+  border: 1px dashed #d0d7de;
+}
+
+.debug-section h3 {
+  margin: 0 0 16px 0;
+  color: #333;
+  font-size: 16px;
+}
+
+.debug-actions {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.debug-btn {
+  padding: 10px 16px;
+  background: white;
+  border: 1px solid #d0d7de;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 14px;
+  color: #333;
+  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.debug-btn:hover {
+  background: #f0f0f0;
+  border-color: #999;
+}
+
+.debug-btn.refresh {
+  background: #667eea;
+  color: white;
+  border-color: #667eea;
+}
+
+.debug-btn.refresh:hover {
+  background: #5a6fd8;
+}
+
+/* Loading State */
+.dashboard-loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 400px;
+}
+
+.spinner {
+  width: 40px;
+  height: 40px;
+  border: 4px solid #f3f3f3;
+  border-top: 4px solid #667eea;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+  margin-bottom: 16px;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+/* Responsive */
 @media (max-width: 768px) {
-  .dashboard-stats {
+  .dashboard {
+    padding: 16px;
+  }
+  
+  .dashboard-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 16px;
+  }
+  
+  .stats-grid {
+    grid-template-columns: 1fr;
+  }
+  
+  .action-buttons {
     flex-direction: column;
   }
-
-  .stat-card {
+  
+  .action-btn {
     width: 100%;
+    justify-content: center;
+  }
+  
+  .row-actions {
+    flex-direction: column;
+    gap: 8px;
   }
 }
