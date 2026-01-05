@@ -1,4 +1,4 @@
-// frontend/src/pages/BlogPost.js - ENHANCED VERSION
+// frontend/src/pages/BlogPost.js - FIXED IMAGE VERSION
 import React, { useState, useEffect } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { publicAPI } from '../services/api';
@@ -11,44 +11,57 @@ const BlogPost = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [relatedBlogs, setRelatedBlogs] = useState([]);
+  const [imageError, setImageError] = useState(false);
+
+  // Backend URL - MUST be the same as BlogList.js
+  const BACKEND_URL = 'https://zmo-backend.onrender.com';
 
   useEffect(() => {
     const fetchBlog = async () => {
       try {
         setLoading(true);
         setError('');
+        setImageError(false);
         console.log(`📖 Fetching blog with ID: ${id}`);
         
         if (!id || id === 'undefined') {
           throw new Error('Invalid blog ID');
         }
 
-        // ✅ Use publicAPI.getBlogById() for frontend access
         const response = await publicAPI.getBlogById(id);
+        console.log('📊 Blog API Response:', response);
         
-        if (response.success && response.data) {
-          console.log('✅ Blog loaded successfully:', response.data.title);
-          setBlog(response.data);
-          
-          // Fetch related blogs based on tags
-          await fetchRelatedBlogs(response.data.tags, id);
-        } else {
-          throw new Error(response.message || 'Blog not found');
+        // Handle different response formats
+        let blogData = null;
+        if (response && response.success === true) {
+          if (response.data) {
+            blogData = response.data;
+          } else if (response.blog) {
+            blogData = response.blog;
+          }
+        } else if (response) {
+          blogData = response;
         }
+        
+        if (!blogData) {
+          throw new Error('Blog data not available');
+        }
+        
+        console.log('✅ Blog loaded successfully:', blogData.title);
+        console.log('🔍 Blog image data:', {
+          image: blogData.image,
+          featuredImage: blogData.featuredImage,
+          thumbnail: blogData.thumbnail,
+          coverImage: blogData.coverImage
+        });
+        
+        setBlog(blogData);
+        
+        // Fetch related blogs based on tags
+        await fetchRelatedBlogs(blogData.tags, id);
       } catch (error) {
         console.error('❌ Error fetching blog:', error);
-        
-        // Enhanced error messages
-        let errorMessage = error.message;
-        if (error.message.includes('Network Error') || error.message.includes('Failed to fetch')) {
-          errorMessage = 'Cannot connect to the server. Please check your internet connection.';
-        } else if (error.message.includes('404')) {
-          errorMessage = 'Blog post not found. It may have been removed or the URL is incorrect.';
-        } else if (error.message.includes('timeout')) {
-          errorMessage = 'Request timed out. Please try again.';
-        }
-        
-        setError(errorMessage);
+        setError(error.message || 'Failed to load blog post.');
       } finally {
         setLoading(false);
       }
@@ -56,17 +69,17 @@ const BlogPost = () => {
 
     const fetchRelatedBlogs = async (tags = [], currentBlogId) => {
       try {
-        if (!tags.length) return;
+        if (!tags || !tags.length) return;
         
         const response = await publicAPI.getBlogs();
         if (response.success && response.data) {
-          // Filter out current blog and find blogs with matching tags
           const related = response.data
             .filter(blog => blog._id !== currentBlogId)
             .filter(blog => 
-              blog.tags && blog.tags.some(tag => tags.includes(tag))
+              blog.tags && Array.isArray(blog.tags) && 
+              blog.tags.some(tag => tags.includes(tag))
             )
-            .slice(0, 3); // Limit to 3 related blogs
+            .slice(0, 3);
           
           setRelatedBlogs(related);
         }
@@ -83,54 +96,102 @@ const BlogPost = () => {
     }
   }, [id]);
 
-  // Safe date formatting
+  // 🔥 CRITICAL FIX: Use the SAME getImageUrl function as BlogList.js
+  const getImageUrl = (blog) => {
+    if (!blog) return null;
+    
+    console.log('🖼️ Processing image for blog:', blog.title);
+    
+    // Try all possible image field names - MUST match BlogList.js
+    const possibleImageFields = [
+      'image',
+      'featuredImage', 
+      'thumbnail',
+      'coverImage',
+      'imageUrl',
+      'banner'
+    ];
+    
+    let imagePath = null;
+    
+    // Find the first non-empty image field
+    for (const field of possibleImageFields) {
+      if (blog[field] && typeof blog[field] === 'string' && blog[field].trim()) {
+        imagePath = blog[field];
+        console.log(`✅ Found image in field "${field}":`, imagePath);
+        break;
+      }
+    }
+    
+    if (!imagePath) {
+      console.log('❌ No image found for blog:', blog.title);
+      return null;
+    }
+    
+    // Clean up the image path
+    imagePath = imagePath.trim();
+    
+    // CASE 1: Already a full URL
+    if (imagePath.startsWith('http://') || imagePath.startsWith('https://')) {
+      console.log('✅ Image is already a full URL');
+      return imagePath;
+    }
+    
+    // CASE 2: Data URL
+    if (imagePath.startsWith('data:image/')) {
+      console.log('✅ Image is data URL');
+      return imagePath;
+    }
+    
+    // CASE 3: Starts with /uploads
+    if (imagePath.startsWith('/uploads/')) {
+      const fullUrl = `${BACKEND_URL}${imagePath}`;
+      console.log('✅ Constructed uploads URL:', fullUrl);
+      return fullUrl;
+    }
+    
+    // CASE 4: Starts with / (but not /uploads)
+    if (imagePath.startsWith('/')) {
+      const fullUrl = `${BACKEND_URL}${imagePath}`;
+      console.log('✅ Constructed root path URL:', fullUrl);
+      return fullUrl;
+    }
+    
+    // CASE 5: Just a filename
+    const fullUrl = `${BACKEND_URL}/uploads/${imagePath}`;
+    console.log('✅ Constructed uploads filename URL:', fullUrl);
+    return fullUrl;
+  };
+
+  const handleImageError = (e) => {
+    console.error('❌ Featured image failed to load:', e.target.src);
+    setImageError(true);
+    e.target.style.display = 'none';
+  };
+
   const formatDate = (dateString) => {
     if (!dateString) return 'Unknown date';
-    
     try {
       const date = new Date(dateString);
-      if (isNaN(date.getTime())) return 'Invalid date';
-      
       const options = { 
         year: 'numeric', 
         month: 'long', 
-        day: 'numeric'
+        day: 'numeric' 
       };
       return date.toLocaleDateString('en-US', options);
-    } catch (error) {
-      console.warn('Date formatting error:', error);
+    } catch {
       return 'Invalid date';
     }
   };
 
-  // Format time for updated date
-  const formatTime = (dateString) => {
-    if (!dateString) return '';
-    
-    try {
-      const date = new Date(dateString);
-      if (isNaN(date.getTime())) return '';
-      
-      return date.toLocaleTimeString('en-US', {
-        hour: '2-digit',
-        minute: '2-digit'
-      });
-    } catch (error) {
-      return '';
-    }
-  };
-
-  // Handle retry
   const handleRetry = () => {
     window.location.reload();
   };
 
-  // Handle back to blogs
   const handleBackToBlogs = () => {
-    navigate('/blog'); // Changed from '/blogs' to match your routing
+    navigate('/blogs');
   };
 
-  // Safe content rendering
   const renderContent = () => {
     if (!blog) return null;
 
@@ -145,10 +206,6 @@ const BlogPost = () => {
       return (
         <div className="content-text">
           <p className="excerpt">{blog.excerpt}</p>
-          <div className="content-unavailable">
-            <i className="fas fa-info-circle"></i>
-            <p>Full content is not available for this blog post.</p>
-          </div>
         </div>
       );
     } else {
@@ -161,12 +218,6 @@ const BlogPost = () => {
     }
   };
 
-  // Handle image error
-  const handleImageError = (e) => {
-    console.warn('Featured image failed to load');
-    e.target.style.display = 'none';
-  };
-
   if (loading) {
     return (
       <div className="blog-post-page">
@@ -174,10 +225,6 @@ const BlogPost = () => {
           <div className="loading-state">
             <div className="loading-spinner"></div>
             <h2>Loading Blog Post...</h2>
-            <p>Please wait while we fetch the content</p>
-            <div className="loading-details">
-              <small>Blog ID: {id}</small>
-            </div>
           </div>
         </div>
       </div>
@@ -189,29 +236,15 @@ const BlogPost = () => {
       <div className="blog-post-page">
         <div className="container">
           <div className="error-state">
-            <div className="error-icon">
-              <i className="fas fa-exclamation-triangle"></i>
-            </div>
             <h2>Unable to Load Blog Post</h2>
             <p className="error-message">{error}</p>
-            
-            <div className="error-details">
-              <p><strong>Blog ID:</strong> {id || 'Not provided'}</p>
-              <p><strong>Backend URL:</strong> {process.env.REACT_APP_API_URL || 'https://zmo-backend.onrender.com'}</p>
-              <p><strong>Endpoint:</strong> /api/blogs/{id}</p>
-              <p><strong>Environment:</strong> {process.env.NODE_ENV}</p>
-            </div>
-            
             <div className="error-actions">
               <button onClick={handleRetry} className="btn btn-primary">
                 <i className="fas fa-redo"></i> Try Again
               </button>
               <button onClick={handleBackToBlogs} className="btn btn-outline">
-                <i className="fas fa-arrow-left"></i> Back to Blog
+                <i className="fas fa-arrow-left"></i> Back to Blogs
               </button>
-              <Link to="/" className="btn btn-outline">
-                <i className="fas fa-home"></i> Go Home
-              </Link>
             </div>
           </div>
         </div>
@@ -225,36 +258,31 @@ const BlogPost = () => {
         <div className="container">
           <div className="not-found-state">
             <h2>Blog Post Not Available</h2>
-            <p>The requested blog post could not be found or is no longer available.</p>
-            <div className="not-found-actions">
-              <button onClick={handleBackToBlogs} className="btn btn-primary">
-                <i className="fas fa-arrow-left"></i> Back to Blog
-              </button>
-              <Link to="/" className="btn btn-outline">
-                <i className="fas fa-home"></i> Go Home
-              </Link>
-            </div>
+            <button onClick={handleBackToBlogs} className="btn btn-primary">
+              <i className="fas fa-arrow-left"></i> Back to All Blogs
+            </button>
           </div>
         </div>
       </div>
     );
   }
 
+  // 🔥 Get image URL using the SAME function
+  const imageUrl = getImageUrl(blog);
+
   return (
     <div className="blog-post-page">
       <div className="container">
-        {/* Breadcrumb Navigation */}
         <nav className="breadcrumb">
           <Link to="/" className="breadcrumb-item">Home</Link>
           <span className="breadcrumb-separator">/</span>
-          <Link to="/blog" className="breadcrumb-item">Blog</Link>
+          <Link to="/blogs" className="breadcrumb-item">Blog</Link>
           <span className="breadcrumb-separator">/</span>
-          <span className="breadcrumb-item active" title={blog.title}>
+          <span className="breadcrumb-item active">
             {blog.title.length > 30 ? blog.title.substring(0, 30) + '...' : blog.title}
           </span>
         </nav>
 
-        {/* Blog Article */}
         <article className="blog-article">
           <header className="blog-header">
             <h1 className="blog-title">{blog.title}</h1>
@@ -267,27 +295,20 @@ const BlogPost = () => {
                 </span>
                 <span className="blog-date">
                   <i className="fas fa-calendar"></i>
-                  Published on {formatDate(blog.createdAt)}
+                  Published on {formatDate(blog.createdAt || blog.date)}
                 </span>
-                {blog.updatedAt && blog.updatedAt !== blog.createdAt && (
-                  <span className="blog-updated" title={`Updated at ${formatTime(blog.updatedAt)}`}>
-                    <i className="fas fa-edit"></i>
-                    Updated on {formatDate(blog.updatedAt)}
-                  </span>
-                )}
               </div>
               
-              <div className="meta-right">
-                {blog.readTime && (
+              {blog.readTime && (
+                <div className="meta-right">
                   <span className="blog-read-time">
                     <i className="fas fa-clock"></i>
                     {blog.readTime} min read
                   </span>
-                )}
-              </div>
+                </div>
+              )}
             </div>
 
-            {/* Tags */}
             {blog.tags && blog.tags.length > 0 && (
               <div className="blog-tags-main">
                 <i className="fas fa-tags"></i>
@@ -300,41 +321,43 @@ const BlogPost = () => {
             )}
           </header>
 
-          {/* Featured Image */}
-          {(blog.featuredImage || blog.image) && (
-            <div className="blog-featured-image">
-              <img 
-                src={blog.featuredImage || blog.image} 
-                alt={blog.title}
-                onError={handleImageError}
-                loading="lazy"
-              />
-            </div>
-          )}
+          {/* 🔥 Featured Image with proper error handling */}
+          <div className="featured-image-section">
+            {imageUrl && !imageError ? (
+              <div className="blog-featured-image">
+                <img 
+                  src={imageUrl}
+                  alt={blog.title}
+                  onError={handleImageError}
+                  loading="lazy"
+                  className="featured-img"
+                />
+                {/* Debug info for development */}
+                {process.env.NODE_ENV === 'development' && (
+                  <div className="image-debug">
+                    <small>URL: {imageUrl.length > 50 ? '...' + imageUrl.slice(-50) : imageUrl}</small>
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div className="image-placeholder">
+                <i className="fas fa-image"></i>
+                <p>Image not available</p>
+              </div>
+            )}
+          </div>
 
-          {/* Blog Content */}
           <div className="blog-content">
             {renderContent()}
           </div>
 
-          {/* Blog Footer */}
           <footer className="blog-footer">
             <div className="blog-actions">
-              <button onClick={() => window.history.back()} className="btn btn-outline">
-                <i className="fas fa-arrow-left"></i> Back
-              </button>
-              <button onClick={handleBackToBlogs} className="btn btn-outline">
-                <i className="fas fa-list"></i> All Posts
-              </button>
-              <button 
-                onClick={() => window.print()} 
-                className="btn btn-outline"
-              >
-                <i className="fas fa-print"></i> Print
+              <button onClick={handleBackToBlogs} className="btn btn-primary">
+                <i className="fas fa-arrow-left"></i> Back to Blogs
               </button>
             </div>
             
-            {/* Share buttons */}
             <div className="share-section">
               <h4>Share this post</h4>
               <div className="share-buttons">
@@ -354,44 +377,37 @@ const BlogPost = () => {
                 >
                   <i className="fab fa-linkedin"></i> LinkedIn
                 </a>
-                <a 
-                  href={`mailto:?subject=${encodeURIComponent(blog.title)}&body=Check out this blog post: ${encodeURIComponent(window.location.href)}`}
-                  className="share-btn email"
-                >
-                  <i className="fas fa-envelope"></i> Email
-                </a>
               </div>
             </div>
           </footer>
         </article>
 
-        {/* Related Posts Section */}
-        {(relatedBlogs.length > 0) && (
+        {relatedBlogs.length > 0 && (
           <section className="related-posts">
             <h3>Related Posts</h3>
             <div className="related-grid">
-              {relatedBlogs.map(relatedBlog => (
-                <div key={relatedBlog._id} className="related-post-card">
-                  <h4>
-                    <Link to={`/blog/${relatedBlog._id}`}>
-                      {relatedBlog.title}
-                    </Link>
-                  </h4>
-                  <p>{relatedBlog.excerpt}</p>
-                  <div className="related-meta">
-                    <span>{formatDate(relatedBlog.createdAt)}</span>
-                    <span>{relatedBlog.readTime} min read</span>
+              {relatedBlogs.map(relatedBlog => {
+                const relatedBlogId = relatedBlog._id || relatedBlog.id;
+                return (
+                  <div key={relatedBlogId} className="related-post-card">
+                    <h4>
+                      <Link to={`/blogs/${relatedBlogId}`}>
+                        {relatedBlog.title}
+                      </Link>
+                    </h4>
+                    <p>{relatedBlog.excerpt || relatedBlog.content?.substring(0, 100)}...</p>
+                    <div className="related-meta">
+                      <span>{formatDate(relatedBlog.createdAt)}</span>
+                    </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           </section>
         )}
 
-        {/* Call to Action */}
         <section className="blog-cta">
           <h3>Enjoyed this article?</h3>
-          <p>Check out more posts from our blog</p>
           <button onClick={handleBackToBlogs} className="btn btn-primary">
             <i className="fas fa-newspaper"></i> View All Blog Posts
           </button>

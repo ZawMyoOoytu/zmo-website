@@ -1,125 +1,182 @@
-// admin-panel/src/pages/Blogs/BlogCreate.js
+// src/pages/Blogs/BlogCreate.js - COMPLETE VERSION
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import BlogForm from '../../components/forms/BlogForm';
-import { blogService } from '../../services/blogService';
-import './BlogCreate.css';
 
 const BlogCreate = () => {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
+  const [message, setMessage] = useState({ type: '', text: '' });
 
-  const handleSubmit = async (blogData) => {
+  const handleCreateBlog = async (formData) => {
+    console.log('Creating blog:', formData);
     setLoading(true);
-    setError('');
+    setMessage({ type: '', text: '' });
     
     try {
-      console.log('📝 Creating blog post:', blogData);
+      // Get authentication token
+      const token = localStorage.getItem('adminToken');
       
-      const result = await blogService.createBlog(blogData);
-      
-      console.log('📝 API Response:', result);
-      
-      if (result.success) {
-        alert('✅ Blog created successfully!');
-        
-        // Navigate back to blog management
-        navigate('/blogs');
-      } else {
-        // Show specific error message
-        setError(result.error || result.message || 'Failed to create blog post');
-        alert(`❌ Error: ${result.error || result.message}`);
+      if (!token) {
+        throw new Error('You must be logged in to create blogs. Please login again.');
       }
-    } catch (error) {
-      console.error('💥 Error in blog creation:', error);
-      setError(error.message || 'An unexpected error occurred');
-      alert(`❌ Error: ${error.message}`);
+
+      // Call your actual API
+      const response = await fetch('https://zmo-backend.onrender.com/api/blogs', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          ...formData,
+          author: 'Admin', // Set default author
+          views: 0,
+          comments: 0,
+          likes: 0
+        })
+      });
+
+      const data = await response.json();
+      console.log('API Response:', data);
+
+      if (response.ok) {
+        setMessage({ 
+          type: 'success', 
+          text: '✅ Blog created successfully!' 
+        });
+        
+        // Redirect after 2 seconds
+        setTimeout(() => {
+          navigate('/admin/blogs');
+        }, 2000);
+      } else {
+        throw new Error(data.error || data.message || `Error: ${response.status}`);
+      }
+    } catch (err) {
+      console.error('Error creating blog:', err);
+      
+      let errorMessage = err.message;
+      
+      // Handle specific errors
+      if (err.message.includes('Failed to fetch')) {
+        errorMessage = 'Cannot connect to server. Please check your internet connection.';
+      } else if (err.message.includes('401') || err.message.includes('not logged in')) {
+        errorMessage = 'Session expired. Please login again.';
+        setTimeout(() => navigate('/admin/login'), 2000);
+      } else if (err.message.includes('500')) {
+        errorMessage = 'Server error. Please try again later.';
+      }
+      
+      setMessage({ 
+        type: 'error', 
+        text: `❌ ${errorMessage}` 
+      });
     } finally {
       setLoading(false);
     }
   };
 
   const handleCancel = () => {
-    if (window.confirm('Are you sure you want to cancel? Any unsaved changes will be lost.')) {
-      navigate('/blogs');
+    navigate('/admin/blogs');
+  };
+
+  const styles = {
+    container: {
+      padding: '30px',
+      maxWidth: '1200px',
+      margin: '0 auto'
+    },
+    header: {
+      marginBottom: '30px',
+      paddingBottom: '20px',
+      borderBottom: '2px solid #e9ecef'
+    },
+    title: {
+      margin: '0 0 10px 0',
+      fontSize: '28px',
+      color: '#333',
+      fontWeight: '600'
+    },
+    subtitle: {
+      color: '#666',
+      margin: 0,
+      fontSize: '16px'
+    },
+    messageAlert: {
+      padding: '15px',
+      borderRadius: '8px',
+      marginBottom: '20px',
+      display: 'flex',
+      justifyContent: 'space-between',
+      alignItems: 'center'
+    },
+    success: {
+      background: '#d4edda',
+      color: '#155724',
+      border: '1px solid #c3e6cb'
+    },
+    error: {
+      background: '#f8d7da',
+      color: '#721c24',
+      border: '1px solid #f5c6cb'
+    },
+    messageClose: {
+      background: 'none',
+      border: 'none',
+      fontSize: '20px',
+      cursor: 'pointer',
+      color: 'inherit'
     }
   };
 
   return (
-    <div className="blog-create">
-      {/* Header Section */}
-      <div className="blog-create-header">
-        <div>
-          <h1>Create New Blog Post</h1>
-          <p>Fill in the details below to create a new blog post</p>
-        </div>
-        
-        <div className="header-actions">
-          <button 
-            onClick={handleCancel}
-            className="btn btn-secondary"
-            disabled={loading}
-          >
-            Cancel
-          </button>
-        </div>
+    <div style={styles.container}>
+      {/* Header */}
+      <div style={styles.header}>
+        <h1 style={styles.title}>Create New Blog Post</h1>
+        <p style={styles.subtitle}>Fill in the details to create a new blog post</p>
       </div>
 
-      {/* Error Display */}
-      {error && (
-        <div className="error-alert">
-          <strong>Error:</strong> {error}
+      {/* Message Alert */}
+      {message.text && (
+        <div style={{ 
+          ...styles.messageAlert, 
+          ...styles[message.type]
+        }}>
+          <span>{message.text}</span>
           <button 
-            onClick={() => setError('')}
-            className="btn-dismiss"
+            style={styles.messageClose}
+            onClick={() => setMessage({ type: '', text: '' })}
           >
-            Dismiss
+            ×
           </button>
         </div>
       )}
 
-      {/* Quick Test Button - Remove in production */}
-      <div className="debug-section">
-        <button 
-          onClick={async () => {
-            console.log('🧪 Testing blog creation...');
-            const testData = {
-              title: 'Test Blog ' + new Date().toLocaleTimeString(),
-              excerpt: 'This is a test blog post',
-              content: 'This is test content for the blog post.',
-              author: 'Test Author',
-              readTime: 5,
-              tags: ['test', 'demo'],
-              status: 'draft',
-              featured: false,
-              imageUrl: ''
-            };
-            
-            try {
-              const result = await blogService.createBlog(testData);
-              console.log('Test result:', result);
-              alert(result.success ? '✅ Test successful!' : '❌ Test failed');
-            } catch (error) {
-              console.error('Test error:', error);
-              alert('❌ Test failed: ' + error.message);
-            }
-          }}
-          className="btn-test"
-        >
-          🧪 Test Blog Creation
-        </button>
-      </div>
+      {/* Blog Form */}
+      <BlogForm
+        onSubmit={handleCreateBlog}
+        onCancel={handleCancel}
+        loading={loading}
+      />
 
-      {/* BlogForm Container */}
-      <div className="blog-form-container">
-        {/* UPDATED: Pass initialData instead of expecting it to handle undefined */}
-        <BlogForm
-          initialData={{}} // Pass empty object for new blog
-          onSubmit={handleSubmit}
-          onCancel={handleCancel}
-          loading={loading}
-        />
+      {/* Help Text */}
+      <div style={{
+        marginTop: '30px',
+        padding: '15px',
+        background: '#f8f9fa',
+        borderRadius: '8px',
+        fontSize: '14px',
+        color: '#666'
+      }}>
+        <p style={{ margin: '0 0 10px 0', fontWeight: '500' }}>💡 Tips:</p>
+        <ul style={{ margin: '0', paddingLeft: '20px' }}>
+          <li>Title and Content are required fields</li>
+          <li>Use tags to help categorize your blog posts</li>
+          <li>Set status to "Draft" if you want to save without publishing</li>
+          <li>Featured posts will be highlighted in the blog list</li>
+        </ul>
       </div>
     </div>
   );

@@ -1,4 +1,4 @@
-// frontend/src/components/BlogCard.js
+// frontend/src/components/BlogCard.js - UPDATED VERSION
 import React from 'react';
 import { Link } from 'react-router-dom';
 
@@ -23,7 +23,6 @@ const BlogCard = ({ blog }) => {
     }
     
     if (content && content.trim() !== '') {
-      // Remove markdown-like syntax and truncate
       const plainContent = content
         .replace(/[#*\[\]_`]/g, '')
         .replace(/\s+/g, ' ')
@@ -55,9 +54,14 @@ const BlogCard = ({ blog }) => {
   const handleImageError = (e) => {
     console.warn('Blog image failed to load:', image);
     e.target.style.display = 'none';
+    // Show placeholder after error
+    const placeholder = document.createElement('div');
+    placeholder.className = 'w-full h-48 bg-gray-100 flex items-center justify-center';
+    placeholder.innerHTML = `<span class="text-gray-500 text-lg font-semibold">${title.charAt(0).toUpperCase()}</span>`;
+    e.target.parentNode.appendChild(placeholder);
   };
 
-  // Generate placeholder image based on title
+  // Generate placeholder image
   const getPlaceholderImage = () => {
     const colors = ['bg-blue-100', 'bg-green-100', 'bg-purple-100', 'bg-orange-100'];
     const color = colors[title.length % colors.length];
@@ -71,18 +75,66 @@ const BlogCard = ({ blog }) => {
     );
   };
 
+  // ✅ **FIXED: Improved image URL handling**
+  const getImageUrl = (imgPath) => {
+    if (!imgPath || imgPath.trim() === '') {
+      console.log('No image path provided for blog:', title);
+      return null;
+    }
+    
+    const BACKEND_URL = 'https://zmo-backend.onrender.com';
+    
+    console.log('Processing image path:', imgPath); // Debug log
+    
+    // Already a full URL (including cloud storage URLs)
+    if (imgPath.startsWith('http://') || imgPath.startsWith('https://')) {
+      console.log('Using full URL:', imgPath);
+      return imgPath;
+    }
+    
+    // Handle relative paths
+    if (imgPath.startsWith('/uploads/') || imgPath.startsWith('/')) {
+      // Remove leading slash if it's already part of the path
+      const cleanPath = imgPath.startsWith('/') && imgPath.startsWith('/uploads/') 
+        ? imgPath 
+        : imgPath.startsWith('/') 
+          ? imgPath 
+          : `/${imgPath}`;
+      
+      const fullUrl = `${BACKEND_URL}${cleanPath}`;
+      console.log('Constructed URL from relative path:', fullUrl);
+      return fullUrl;
+    }
+    
+    // Just filename - assume it's in uploads folder
+    const fullUrl = `${BACKEND_URL}/uploads/${imgPath}`;
+    console.log('Constructed URL from filename:', fullUrl);
+    return fullUrl;
+  };
+
+  const imageUrl = getImageUrl(image);
+
   return (
     <div className="blog-card bg-white rounded-lg shadow-md overflow-hidden hover:shadow-lg transition-shadow duration-300 border border-gray-100">
-      {/* Image Section with Fallback */}
-      <div className="image-container">
-        {image ? (
-          <img 
-            src={image} 
-            alt={title}
-            className="w-full h-48 object-cover"
-            onError={handleImageError}
-            loading="lazy"
-          />
+      {/* Image Section */}
+      <div className="image-container relative h-48 bg-gray-100">
+        {imageUrl ? (
+          <>
+            <img 
+              src={imageUrl} 
+              alt={title}
+              className="w-full h-full object-cover"
+              onError={handleImageError}
+              loading="lazy"
+              onLoad={() => console.log('Image loaded successfully:', imageUrl)}
+            />
+            {/* Fallback that shows if image fails */}
+            <div className="absolute inset-0 flex items-center justify-center bg-gray-100 opacity-0 hover:opacity-100 transition-opacity duration-300">
+              <span className="text-gray-500 text-lg font-semibold">
+                {title.charAt(0).toUpperCase()}
+              </span>
+            </div>
+          </>
         ) : (
           getPlaceholderImage()
         )}
@@ -135,15 +187,14 @@ const BlogCard = ({ blog }) => {
             </div>
           </div>
           
-          {/* Read More Link */}
           <div className="meta-right">
             <Link 
-              to={`/blog/${_id}`}
+              to={`/blogs/${_id}`}
               className="inline-flex items-center text-blue-600 hover:text-blue-700 font-medium transition-colors duration-200"
               onClick={(e) => {
                 if (!_id) {
                   e.preventDefault();
-                  console.error('Blog ID is missing');
+                  console.error('Blog ID is missing:', blog);
                 }
               }}
             >
@@ -169,7 +220,6 @@ const BlogCard = ({ blog }) => {
   );
 };
 
-// Default props for safety
 BlogCard.defaultProps = {
   blog: {
     _id: '',

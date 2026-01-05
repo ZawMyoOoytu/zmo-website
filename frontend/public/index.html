@@ -5,39 +5,190 @@
     <link rel="icon" href="%PUBLIC_URL%/favicon.ico" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="theme-color" content="#000000" />
+    
+    <!-- Better SEO meta tags -->
     <meta
       name="description"
-      content="Web site created using create-react-app"
+      content="CYBARCSOFT - Algorithmic Solutions for Modern Problems Based On Politics@Media Education and ICT Platforms"
     />
-    <link rel="apple-touch-icon" href="%PUBLIC_URL%/logo192.png" />
-    <!--
-      manifest.json provides metadata used when your web app is installed on a
-      user's mobile device or desktop. See https://developers.google.com/web/fundamentals/web-app-manifest/
-    -->
+    
+    <!-- Open Graph meta tags for social media -->
+    <meta property="og:title" content="CYBARCSOFT" />
+    <meta property="og:description" content="Algorithmic Solutions for Modern Problems Based On Politics@Media Education and ICT Platforms" />
+    <meta property="og:type" content="website" />
+    <meta property="og:url" content="https://your-domain.com" />
+    
+    <!-- Twitter Card meta tags -->
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="CYBARCSOFT" />
+    <meta name="twitter:description" content="Algorithmic Solutions for Modern Problems" />
+    
+    <!-- Favicon for various devices -->
+    <link rel="icon" type="image/png" sizes="32x32" href="%PUBLIC_URL%/favicon-32x32.png">
+    <link rel="icon" type="image/png" sizes="16x16" href="%PUBLIC_URL%/favicon-16x16.png">
+    <link rel="apple-touch-icon" sizes="180x180" href="%PUBLIC_URL%/apple-touch-icon.png">
+    
+    <!-- Add FontAwesome for icons with better attributes -->
+    <link 
+      rel="stylesheet" 
+      href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" 
+      integrity="sha512-iecdLmaskl7CVkqkXNQ/ZH/XLlvWZOJyj7Yy7tcenmpD1ypASozpmT/E0iPtmFIB46ZmdtAc9eNBvH0H/ZpiBw==" 
+      crossorigin="anonymous" 
+      referrerpolicy="no-referrer" 
+      media="print" onload="this.media='all'"
+    />
+    
+    <!-- Preconnect to CDN for better performance -->
+    <link rel="preconnect" href="https://cdnjs.cloudflare.com">
+    
+    <!-- Optional: Add Google Fonts if needed -->
+    <!-- <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet"> -->
+    
+    <!-- Manifest for PWA -->
     <link rel="manifest" href="%PUBLIC_URL%/manifest.json" />
-    <!--
-      Notice the use of %PUBLIC_URL% in the tags above.
-      It will be replaced with the URL of the `public` folder during the build.
-      Only files inside the `public` folder can be referenced from the HTML.
-
-      Unlike "/favicon.ico" or "favicon.ico", "%PUBLIC_URL%/favicon.ico" will
-      work correctly both with client-side routing and a non-root public URL.
-      Learn how to configure a non-root public URL by running `npm run build`.
-    -->
-    <title>React App</title>
+    
+    <!-- Title with your brand -->
+    <title>CYBARCSOFT | Algorithmic Solutions for Modern Problems</title>
+    
+    <!-- Additional meta tags for better mobile experience -->
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="format-detection" content="telephone=no">
+    
+    <!-- CSS to prevent FOUC (Flash of Unstyled Content) -->
+    <style>
+      /* Prevent FOUC */
+      .js-loading *,
+      .js-loading *:before,
+      .js-loading *:after {
+        animation-play-state: paused !important;
+      }
+      
+      /* Font fallback */
+      body {
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
+          'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
+          sans-serif;
+        -webkit-font-smoothing: antialiased;
+        -moz-osx-font-smoothing: grayscale;
+        margin: 0;
+        padding: 0;
+        background: #f8f9fa;
+      }
+      
+      /* Loading animation */
+      .app-loading {
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        color: white;
+        z-index: 9999;
+        transition: opacity 0.3s ease;
+      }
+      
+      .app-loading.hidden {
+        opacity: 0;
+        pointer-events: none;
+      }
+      
+      .loading-spinner {
+        width: 60px;
+        height: 60px;
+        border: 4px solid rgba(255, 255, 255, 0.3);
+        border-top: 4px solid white;
+        border-radius: 50%;
+        animation: spin 1s linear infinite;
+        margin-bottom: 20px;
+      }
+      
+      @keyframes spin {
+        0% { transform: rotate(0deg); }
+        100% { transform: rotate(360deg); }
+      }
+    </style>
   </head>
-  <body>
-    <noscript>You need to enable JavaScript to run this app.</noscript>
+  <body class="js-loading">
+    <!-- Loading screen -->
+    <div id="app-loading" class="app-loading">
+      <div class="loading-spinner"></div>
+      <div>Loading CYBARCSOFT...</div>
+    </div>
+    
+    <noscript>
+      <div style="
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: white;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        text-align: center;
+        padding: 20px;
+        z-index: 10000;
+      ">
+        <div>
+          <h1 style="color: #333; margin-bottom: 20px;">JavaScript Required</h1>
+          <p style="color: #666; margin-bottom: 20px;">
+            This website requires JavaScript to function properly. Please enable JavaScript in your browser settings.
+          </p>
+          <p style="color: #999; font-size: 14px;">
+            CYBARCSOFT - Algorithmic Solutions for Modern Problems
+          </p>
+        </div>
+      </div>
+    </noscript>
+    
     <div id="root"></div>
-    <!--
-      This HTML file is a template.
-      If you open it directly in the browser, you will see an empty page.
-
-      You can add webfonts, meta tags, or analytics to this file.
-      The build step will place the bundled scripts into the <body> tag.
-
-      To begin the development, run `npm start` or `yarn start`.
-      To create a production bundle, use `npm run build` or `yarn build`.
-    -->
+    
+    <!-- Script to handle loading state -->
+    <script>
+      // Remove loading class when page loads
+      document.addEventListener('DOMContentLoaded', function() {
+        document.body.classList.remove('js-loading');
+      });
+      
+      // Handle app loading state
+      window.addEventListener('load', function() {
+        var loadingElement = document.getElementById('app-loading');
+        if (loadingElement) {
+          loadingElement.classList.add('hidden');
+          setTimeout(function() {
+            loadingElement.style.display = 'none';
+          }, 300);
+        }
+      });
+      
+      // If React takes too long, show the content anyway
+      setTimeout(function() {
+        var loadingElement = document.getElementById('app-loading');
+        if (loadingElement && loadingElement.style.display !== 'none') {
+          loadingElement.classList.add('hidden');
+          setTimeout(function() {
+            loadingElement.style.display = 'none';
+          }, 300);
+        }
+      }, 5000); // 5 second timeout
+    </script>
+    
+    <!-- Optional: Add analytics script here -->
+    <!-- <script async src="https://www.googletagmanager.com/gtag/js?id=GA_MEASUREMENT_ID"></script>
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      gtag('js', new Date());
+      gtag('config', 'GA_MEASUREMENT_ID');
+    </script> -->
   </body>
 </html>

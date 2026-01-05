@@ -11,7 +11,7 @@ function Footer() {
             <h3>Quick Links</h3>
             <Link to="/">Home</Link>
             <Link to="/about">About</Link>
-            <Link to="/blog">Blog</Link>
+            <Link to="/blogs">Blog</Link> {/* ✅ FIXED: /blog → /blogs */}
             <Link to="/projects">Projects</Link>
             <Link to="/contact">Contact</Link>
           </div>
@@ -24,7 +24,7 @@ function Footer() {
             <a href="https://linkedin.com/in/yourusername" target="_blank" rel="noopener noreferrer">
               LinkedIn
             </a>
-            <a href="mailto:your@email.com">Email</a>
+            <a href="myothum848@email.com">Email</a>
           </div>
           
           <div className="footer-section">
@@ -36,7 +36,7 @@ function Footer() {
         </div>
         
         <div className="footer-bottom">
-          <p>&copy; 2024 Your Portfolio. All rights reserved.</p>
+          <p>&copy; {new Date().getFullYear()} Your Portfolio. All rights reserved.</p>
         </div>
       </div>
     </footer>

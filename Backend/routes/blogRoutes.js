@@ -1,20 +1,27 @@
-// Backend/routes/blogRoutes.js
 const express = require('express');
 const router = express.Router();
 const mongoose = require('mongoose');
+router.put('/:id', async (req, res) => {
+  console.log("🔹 Update request for blog ID:", req.params.id);
+  console.log("🔹 Payload received:", req.body);
 
-// Blog Schema
+  // existing update logic...
+});
+
+
+// ----------------- BLOG SCHEMA -----------------
 const blogSchema = new mongoose.Schema({
   title: { type: String, required: true },
   content: { type: String, required: true },
   excerpt: { type: String },
   author: { type: String, default: 'Admin' },
   readTime: { type: Number, default: 5 },
+  category: { type: String },
   tags: [{ type: String }],
   status: { type: String, default: 'draft' },
   featured: { type: Boolean, default: false },
   imageUrl: { type: String },
-  published: { type: Boolean, default: false },
+  published: { type: Boolean, default: false }, // important for draft/publish
   image: { type: String },
   views: { type: Number, default: 0 },
   slug: { type: String },
@@ -37,11 +44,11 @@ blogSchema.pre('save', function(next) {
 
 const Blog = mongoose.model('Blog', blogSchema);
 
-// GET /api/blogs - Get all blogs with pagination
+// ----------------- ROUTES -----------------
+
+// GET /api/blogs - List all blogs with pagination
 router.get('/', async (req, res) => {
   try {
-    console.log('📝 Fetching blogs from database...');
-    
     const page = parseInt(req.query.page) || 1;
     const limit = parseInt(req.query.limit) || 10;
     const skip = (page - 1) * limit;
@@ -54,100 +61,40 @@ router.get('/', async (req, res) => {
 
     const total = await Blog.countDocuments();
 
-    // Fix image URLs for production
-    const fixedBlogs = blogs.map(blog => {
-      if (blog.image && blog.image.includes('localhost:5000')) {
-        blog.image = blog.image.replace('http://localhost:5000', 'https://zmo-backend.onrender.com');
-      }
-      if (blog.imageUrl && blog.imageUrl.includes('localhost:5000')) {
-        blog.imageUrl = blog.imageUrl.replace('http://localhost:5000', 'https://zmo-backend.onrender.com');
-      }
-      return blog;
-    });
-
-    console.log(`✅ Found ${fixedBlogs.length} blogs`);
-
     res.json({
       success: true,
-      data: fixedBlogs,
+      data: blogs,
       pagination: {
         current: page,
         pages: Math.ceil(total / limit),
-        total: total
-      }
-    });
-
-  } catch (error) {
-    console.error('❌ Error fetching blogs:', error);
-    res.status(500).json({
-      success: false,
-      error: 'Failed to fetch blogs',
-      message: error.message
-    });
-  }
-});
-
-// GET /api/blogs/stats - Get blog statistics
-router.get('/stats', async (req, res) => {
-  try {
-    const totalBlogs = await Blog.countDocuments();
-    const publishedBlogs = await Blog.countDocuments({ published: true });
-    const draftBlogs = await Blog.countDocuments({ published: false });
-    const featuredBlogs = await Blog.countDocuments({ featured: true });
-
-    res.json({
-      success: true,
-      data: {
-        total: totalBlogs,
-        published: publishedBlogs,
-        drafts: draftBlogs,
-        featured: featuredBlogs
+        total
       }
     });
   } catch (error) {
-    console.error('Error fetching blog stats:', error);
-    res.status(500).json({
-      success: false,
-      error: 'Failed to fetch blog statistics'
-    });
+    console.error('❌ Failed to fetch blogs:', error);
+    res.status(500).json({ success: false, error: 'Failed to fetch blogs', message: error.message });
   }
 });
 
-// GET /api/blogs/:id - Get single blog by ID
+// GET /api/blogs/:id - Get a single blog
 router.get('/:id', async (req, res) => {
   try {
     const blog = await Blog.findById(req.params.id);
-    
-    if (!blog) {
-      return res.status(404).json({
-        success: false,
-        error: 'Blog not found'
-      });
-    }
+    if (!blog) return res.status(404).json({ success: false, error: 'Blog not found' });
 
-    // Fix image URLs
-    if (blog.image && blog.image.includes('localhost:5000')) {
-      blog.image = blog.image.replace('http://localhost:5000', 'https://zmo-backend.onrender.com');
-    }
-
-    res.json({
-      success: true,
-      data: blog
-    });
+    res.json({ success: true, data: blog });
   } catch (error) {
-    console.error('Error fetching blog:', error);
-    res.status(500).json({
-      success: false,
-      error: 'Failed to fetch blog'
-    });
+    console.error('❌ Failed to fetch blog:', error);
+    res.status(500).json({ success: false, error: 'Failed to fetch blog', message: error.message });
   }
 });
 
-// POST /api/blogs - Create new blog
+// POST /api/blogs - Create a new blog
 router.post('/', async (req, res) => {
   try {
     const blogData = {
       ...req.body,
+      published: !!req.body.isPublished, // map frontend isPublished to backend
       createdAt: new Date(),
       updatedAt: new Date()
     };
@@ -155,75 +102,64 @@ router.post('/', async (req, res) => {
     const blog = new Blog(blogData);
     await blog.save();
 
-    res.status(201).json({
-      success: true,
-      data: blog,
-      message: 'Blog created successfully'
-    });
+    console.log('✅ Blog created:', blog._id);
+
+    res.status(201).json({ success: true, data: blog, message: 'Blog created successfully' });
   } catch (error) {
-    console.error('Error creating blog:', error);
-    res.status(500).json({
-      success: false,
-      error: 'Failed to create blog'
-    });
+    console.error('❌ Failed to create blog:', error);
+    res.status(500).json({ success: false, error: 'Failed to create blog', message: error.message });
   }
 });
 
-// PUT /api/blogs/:id - Update blog
+// PUT /api/blogs/:id - Update an existing blog
 router.put('/:id', async (req, res) => {
   try {
-    const blog = await Blog.findByIdAndUpdate(
-      req.params.id,
-      {
-        ...req.body,
-        updatedAt: new Date()
-      },
-      { new: true, runValidators: true }
-    );
+    const blogId = req.params.id;
 
-    if (!blog) {
-      return res.status(404).json({
-        success: false,
-        error: 'Blog not found'
-      });
-    }
+    // 🔹 Log the request for debugging
+    console.log('🔹 Update request for blog ID:', blogId);
+    console.log('🔹 Payload received:', req.body);
 
-    res.json({
-      success: true,
-      data: blog,
-      message: 'Blog updated successfully'
-    });
+    const updateData = {
+      title: req.body.title,
+      content: req.body.content,
+      excerpt: req.body.excerpt,
+      category: req.body.category,
+      tags: req.body.tags || [],
+      imageUrl: req.body.imageUrl,
+      featured: req.body.featured,
+      // Explicitly handle published flag to avoid losing it
+      published: typeof req.body.isPublished !== 'undefined' 
+        ? req.body.isPublished 
+        : req.body.published || false,
+      updatedAt: new Date()
+    };
+
+    const blog = await Blog.findByIdAndUpdate(blogId, updateData, { new: true, runValidators: true });
+
+    if (!blog) return res.status(404).json({ success: false, error: 'Blog not found' });
+
+    console.log('✅ Blog updated successfully:', blog._id, 'Published:', blog.published);
+
+    res.json({ success: true, data: blog, message: 'Blog updated successfully' });
   } catch (error) {
-    console.error('Error updating blog:', error);
-    res.status(500).json({
-      success: false,
-      error: 'Failed to update blog'
-    });
+    console.error('❌ Failed to update blog:', error);
+    res.status(500).json({ success: false, error: 'Failed to update blog', message: error.message });
   }
 });
 
-// DELETE /api/blogs/:id - Delete blog
+// DELETE /api/blogs/:id - Delete a blog
 router.delete('/:id', async (req, res) => {
   try {
     const blog = await Blog.findByIdAndDelete(req.params.id);
+    if (!blog) return res.status(404).json({ success: false, error: 'Blog not found' });
 
-    if (!blog) {
-      return res.status(404).json({
-        success: false,
-        error: 'Blog not found'
-      });
-    }
+    console.log('🗑️ Blog deleted:', blog._id);
 
-    res.json({
-      success: true,
-      message: 'Blog deleted successfully'
-    });
+    res.json({ success: true, message: 'Blog deleted successfully' });
   } catch (error) {
-    console.error('Error deleting blog:', error);
-    res.status(500).json({
-      success: false,
-      error: 'Failed to delete blog'
-    });
+    console.error('❌ Failed to delete blog:', error);
+    res.status(500).json({ success: false, error: 'Failed to delete blog', message: error.message });
   }
 });
 

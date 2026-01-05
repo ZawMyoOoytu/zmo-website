@@ -1,591 +1,609 @@
-// src/pages/Blogs/BlogList.js - COMPLETELY FIXED VERSION
+// src/components/dashboard/BlogList.js - ENHANCED VERSION
 import React, { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
-
-// 🟢 FIXED: Check if dependencies exist and provide fallbacks
-let blogAPI;
-let LoadingSpinner;
-let ApiDebugger;
-
-try {
-  blogAPI = require('../../services/api').blogAPI;
-} catch (error) {
-  console.log('❌ blogAPI not found, using mock data');
-  blogAPI = {
-    getAll: async () => {
-      // Mock API response
-      return new Promise((resolve) => {
-        setTimeout(() => {
-          resolve({
-            success: true,
-            blogs: [
-              {
-                _id: '1',
-                title: 'Welcome to Your Blog',
-                excerpt: 'This is your first blog post. Start writing!',
-                content: 'This is a sample blog post to get you started. You can edit or delete this post and create new ones.',
-                author: 'Admin',
-                published: true,
-                tags: ['welcome', 'getting-started'],
-                createdAt: new Date().toISOString(),
-                views: 0
-              },
-              {
-                _id: '2',
-                title: 'Draft Post - Edit Me',
-                excerpt: 'This is a draft post that needs completion',
-                content: 'This post is still in draft mode. You can finish writing it and publish when ready.',
-                author: 'Admin',
-                published: false,
-                tags: ['draft'],
-                createdAt: new Date().toISOString(),
-                views: 0
-              }
-            ]
-          });
-        }, 1000);
-      });
-    }
-  };
-}
-
-try {
-  LoadingSpinner = require('../../components/common/LoadingSpinner').default;
-} catch (error) {
-  console.log('❌ LoadingSpinner not found, using fallback');
-  LoadingSpinner = ({ message = "Loading..." }) => (
-    <div style={{ 
-      display: 'flex', 
-      flexDirection: 'column',
-      alignItems: 'center', 
-      justifyContent: 'center', 
-      padding: '40px' 
-    }}>
-      <div style={{
-        width: '40px',
-        height: '40px',
-        border: '4px solid #f3f3f3',
-        borderTop: '4px solid #007bff',
-        borderRadius: '50%',
-        animation: 'spin 1s linear infinite',
-        marginBottom: '15px'
-      }}></div>
-      <style>
-        {`
-          @keyframes spin {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
-          }
-        `}
-      </style>
-      <div style={{ color: '#666', fontSize: '16px' }}>{message}</div>
-    </div>
-  );
-}
-
-try {
-  ApiDebugger = require('../../components/common/ApiDebugger').default;
-} catch (error) {
-  console.log('❌ ApiDebugger not found, using fallback');
-  ApiDebugger = () => (
-    <div style={{
-      backgroundColor: '#e7f3ff',
-      border: '1px solid #b3d9ff',
-      borderRadius: '8px',
-      padding: '15px',
-      marginBottom: '20px'
-    }}>
-      <h4 style={{ margin: '0 0 10px 0', color: '#0066cc' }}>🔧 API Debugger</h4>
-      <p style={{ margin: 0, color: '#666', fontSize: '14px' }}>
-        API Debugger component not available. Check console for debug information.
-      </p>
-    </div>
-  );
-}
+import { useNavigate } from 'react-router-dom';
 
 const BlogList = () => {
   const [blogs, setBlogs] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
-  const [filteredBlogs, setFilteredBlogs] = useState([]);
-  const [refreshTrigger, setRefreshTrigger] = useState(0);
-  const [showDebug, setShowDebug] = useState(true);
+  const [statusFilter, setStatusFilter] = useState('all');
+  const [currentPage, setCurrentPage] = useState(1);
+  const navigate = useNavigate();
+  
+  const blogsPerPage = 10;
 
-  // Fetch ALL blogs for admin (including unpublished)
-  const fetchBlogs = async () => {
-    try {
-      setLoading(true);
-      setError('');
-      console.log('🔄 Fetching blogs...');
-      
-      const result = await blogAPI.getAll();
-      console.log('📊 Blog API response:', result);
-      
-      if (result.success) {
-        const blogsData = result.blogs || result.data || [];
-        console.log(`✅ Loaded ${blogsData.length} blogs`);
-        
-        setBlogs(blogsData);
-        setFilteredBlogs(blogsData);
-        
-        // Debug: Log all blogs
-        blogsData.forEach((blog, index) => {
-          console.log(`📝 Blog ${index + 1}:`, {
-            id: blog._id,
-            title: blog.title,
-            published: blog.published,
-            createdAt: blog.createdAt
-          });
-        });
-      } else {
-        throw new Error(result.message || 'Failed to load blogs');
-      }
-    } catch (error) {
-      console.error('❌ Blog fetch error:', error);
-      setError(error.message || 'Failed to load blog posts');
-      setBlogs([]);
-      setFilteredBlogs([]);
-    } finally {
+  // Mock data
+  const mockBlogs = [
+    {
+      id: 1,
+      title: 'Getting Started with React',
+      excerpt: 'Learn how to build modern web applications with React...',
+      category: 'technology',
+      tags: ['react', 'javascript', 'webdev'],
+      status: 'published',
+      featured: true,
+      author: 'John Doe',
+      views: 1234,
+      comments: 42,
+      likes: 89,
+      createdAt: '2023-10-15',
+      updatedAt: '2023-10-20',
+    },
+    {
+      id: 2,
+      title: 'Advanced JavaScript Patterns',
+      excerpt: 'Explore advanced JavaScript patterns and best practices...',
+      category: 'tutorial',
+      tags: ['javascript', 'patterns', 'programming'],
+      status: 'draft',
+      featured: false,
+      author: 'Jane Smith',
+      views: 0,
+      comments: 0,
+      likes: 0,
+      createdAt: '2023-10-18',
+      updatedAt: '2023-10-18',
+    }
+  ];
+
+  useEffect(() => {
+    // Simulate API call
+    setTimeout(() => {
+      setBlogs(mockBlogs);
       setLoading(false);
-    }
-  };
+    }, 1000);
+  }, []);
 
-  // Refresh function
-  const refreshBlogs = () => {
-    console.log('🔄 Manual refresh triggered');
-    setRefreshTrigger(prev => prev + 1);
-  };
+  // Filter blogs
+  const filteredBlogs = blogs.filter(blog => {
+    const matchesSearch = blog.title.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesStatus = statusFilter === 'all' || blog.status === statusFilter;
+    return matchesSearch && matchesStatus;
+  });
 
-  useEffect(() => {
-    fetchBlogs();
-  }, [refreshTrigger]);
-
-  // Search and filter functionality
-  useEffect(() => {
-    if (searchTerm.trim() === '') {
-      setFilteredBlogs(blogs);
-    } else {
-      const filtered = blogs.filter(blog =>
-        blog.title?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        blog.excerpt?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        blog.content?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        blog.tags?.some(tag => tag.toLowerCase().includes(searchTerm.toLowerCase())) ||
-        blog.author?.toLowerCase().includes(searchTerm.toLowerCase())
-      );
-      setFilteredBlogs(filtered);
-    }
-  }, [searchTerm, blogs]);
+  // Pagination
+  const indexOfLastBlog = currentPage * blogsPerPage;
+  const indexOfFirstBlog = indexOfLastBlog - blogsPerPage;
+  const currentBlogs = filteredBlogs.slice(indexOfFirstBlog, indexOfLastBlog);
+  const totalPages = Math.ceil(filteredBlogs.length / blogsPerPage);
 
   // Format date
   const formatDate = (dateString) => {
-    if (!dateString) return 'Unknown date';
-    
-    try {
-      const options = { 
-        year: 'numeric', 
-        month: 'short', 
-        day: 'numeric',
-        hour: '2-digit',
-        minute: '2-digit'
-      };
-      return new Date(dateString).toLocaleDateString('en-US', options);
-    } catch (error) {
-      return 'Invalid date';
-    }
+    const date = new Date(dateString);
+    return date.toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric'
+    });
   };
 
-  // 🟢 FIXED: Removed unused handleClearSearch function
+  // Handle actions
+  const handleEdit = (blogId) => {
+    navigate(`/admin/blogs/edit/${blogId}`);
+  };
 
-  // 🟢 SIMPLE STYLES
-  const styles = {
-    container: {
-      padding: '20px',
-      backgroundColor: '#f8f9fa',
-      minHeight: '100vh'
-    },
-    header: {
-      display: 'flex',
-      justifyContent: 'space-between',
-      alignItems: 'flex-start',
-      marginBottom: '20px',
-      padding: '20px',
-      backgroundColor: 'white',
-      borderRadius: '8px',
-      boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
-      flexWrap: 'wrap',
-      gap: '15px'
-    },
-    card: {
-      backgroundColor: 'white',
-      borderRadius: '8px',
-      padding: '20px',
-      marginBottom: '20px',
-      boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
-    },
-    table: {
-      width: '100%',
-      borderCollapse: 'collapse',
-      fontSize: '14px'
-    },
-    badge: {
-      padding: '4px 8px',
-      borderRadius: '4px',
-      fontSize: '12px',
-      fontWeight: 'bold',
-      display: 'inline-block'
-    },
-    badgeSuccess: {
-      backgroundColor: '#28a745',
-      color: 'white'
-    },
-    badgeWarning: {
-      backgroundColor: '#ffc107', 
-      color: 'black'
-    },
-    button: {
-      padding: '8px 16px',
-      border: 'none',
-      borderRadius: '4px',
-      cursor: 'pointer',
-      fontSize: '14px',
-      textDecoration: 'none',
-      display: 'inline-block',
-      textAlign: 'center'
-    },
-    buttonPrimary: {
-      backgroundColor: '#007bff',
-      color: 'white'
-    },
-    buttonSecondary: {
-      backgroundColor: '#6c757d',
-      color: 'white'
-    },
-    buttonOutline: {
-      backgroundColor: 'transparent',
-      border: '1px solid #6c757d',
-      color: '#6c757d'
-    }
+  const handleCreate = () => {
+    navigate('/admin/blogs/new');
+  };
+
+  const handleViewPublic = () => {
+    window.open('/blog', '_blank');
+  };
+
+  const handlePublish = (blogId) => {
+    setBlogs(blogs.map(blog => 
+      blog.id === blogId 
+        ? { ...blog, status: blog.status === 'published' ? 'draft' : 'published' }
+        : blog
+    ));
   };
 
   if (loading) {
     return (
-      <div style={styles.container}>
-        <div style={styles.header}>
-          <div>
-            <h1 style={{margin: '0 0 8px 0'}}>Blog Management</h1>
-            <p style={{margin: 0, color: '#666'}}>Manage your blog posts</p>
-          </div>
-        </div>
-        <LoadingSpinner message="Loading blogs..." />
+      <div style={styles.loading}>
+        <div style={styles.spinner}></div>
+        <p>Loading blogs...</p>
       </div>
     );
   }
 
   return (
     <div style={styles.container}>
-      {/* Page Header */}
+      {/* Header */}
       <div style={styles.header}>
         <div>
-          <h1 style={{margin: '0 0 8px 0', fontSize: '28px'}}>Blog Management</h1>
-          <p style={{margin: 0, color: '#666'}}>Create, edit, and manage your blog posts</p>
+          <h1 style={styles.title}>Blog Posts</h1>
+          <p style={styles.subtitle}>Manage your blog posts and content</p>
         </div>
-        <div style={{display: 'flex', gap: '10px', flexWrap: 'wrap'}}>
+        <div style={styles.headerActions}>
           <button 
-            onClick={() => setShowDebug(!showDebug)}
-            style={{...styles.button, ...styles.buttonOutline}}
+            style={styles.createButton}
+            onClick={handleCreate}
           >
-            {showDebug ? 'Hide' : 'Show'} Debug
+            + Create New Blog
           </button>
           <button 
-            onClick={refreshBlogs}
-            style={{...styles.button, ...styles.buttonOutline}}
+            style={styles.viewButton}
+            onClick={handleViewPublic}
           >
-            🔄 Refresh
+            👁 View Public Blog
           </button>
-          <Link 
-            to="/blogs/create" 
-            style={{...styles.button, ...styles.buttonPrimary}}
-          >
-            ➕ Create New Blog
-          </Link>
         </div>
       </div>
 
-      {/* API Debugger */}
-      {showDebug && <ApiDebugger />}
-
-      {/* Debug Info */}
-      <div style={styles.card}>
-        <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px'}}>
-          <div>
-            <strong>📊 Blog Statistics:</strong> 
-            <span style={{marginLeft: '12px'}}>Total: {blogs.length}</span>
-            <span style={{marginLeft: '8px', color: '#28a745'}}>
-              Published: {blogs.filter(b => b.published).length}
-            </span>
-            <span style={{marginLeft: '8px', color: '#ffc107'}}>
-              Drafts: {blogs.filter(b => !b.published).length}
-            </span>
-          </div>
-          <div style={{display: 'flex', alignItems: 'center', gap: '10px'}}>
-            <span style={{color: '#6c757d', fontSize: '14px'}}>
-              Last updated: {new Date().toLocaleTimeString()}
-            </span>
-            <button 
-              onClick={() => console.log('🔍 All blogs:', blogs)}
-              style={{
-                padding: '4px 8px',
-                border: '1px solid #17a2b8',
-                backgroundColor: 'transparent',
-                color: '#17a2b8',
-                borderRadius: '4px',
-                cursor: 'pointer',
-                fontSize: '12px'
-              }}
-            >
-              🐛 Console Log
-            </button>
-          </div>
+      {/* Stats */}
+      <div style={styles.stats}>
+        <div style={styles.statCard}>
+          <div style={styles.statNumber}>{blogs.length}</div>
+          <div style={styles.statLabel}>Total Posts</div>
+        </div>
+        <div style={{...styles.statCard, ...styles.statPublished}}>
+          <div style={styles.statNumber}>{blogs.filter(b => b.status === 'published').length}</div>
+          <div style={styles.statLabel}>Published</div>
+        </div>
+        <div style={{...styles.statCard, ...styles.statDraft}}>
+          <div style={styles.statNumber}>{blogs.filter(b => b.status === 'draft').length}</div>
+          <div style={styles.statLabel}>Drafts</div>
         </div>
       </div>
 
-      {/* Error Alert */}
-      {error && (
-        <div style={{
-          ...styles.card,
-          backgroundColor: '#f8d7da',
-          border: '1px solid #f5c6cb',
-          color: '#721c24'
-        }}>
-          <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px'}}>
-            <div>
-              <strong>Error Loading Blogs:</strong> {error}
-            </div>
+      {/* Filters */}
+      <div style={styles.filters}>
+        <div style={styles.searchContainer}>
+          <input
+            type="text"
+            placeholder="Search blogs..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            style={styles.searchInput}
+          />
+        </div>
+        
+        <div style={styles.filterTabs}>
+          <button 
+            style={{
+              ...styles.filterTab,
+              ...(statusFilter === 'all' && styles.filterTabActive)
+            }}
+            onClick={() => setStatusFilter('all')}
+          >
+            All
+          </button>
+          <button 
+            style={{
+              ...styles.filterTab,
+              ...(statusFilter === 'published' && styles.filterTabActive)
+            }}
+            onClick={() => setStatusFilter('published')}
+          >
+            Published
+          </button>
+          <button 
+            style={{
+              ...styles.filterTab,
+              ...(statusFilter === 'draft' && styles.filterTabActive)
+            }}
+            onClick={() => setStatusFilter('draft')}
+          >
+            Draft
+          </button>
+        </div>
+      </div>
+
+      {/* Blog List */}
+      <div style={styles.blogList}>
+        {currentBlogs.length === 0 ? (
+          <div style={styles.emptyState}>
+            <div style={styles.emptyIcon}>📝</div>
+            <h3>No Blog Posts Found</h3>
+            <p>Try adjusting your filters or create a new blog post</p>
             <button 
-              onClick={refreshBlogs} 
-              style={{
-                padding: '6px 12px',
-                border: '1px solid #dc3545',
-                backgroundColor: 'transparent',
-                color: '#dc3545',
-                borderRadius: '4px',
-                cursor: 'pointer',
-                fontSize: '12px'
-              }}
+              style={styles.createButton}
+              onClick={handleCreate}
             >
-              Retry
+              + Create Your First Post
             </button>
           </div>
-        </div>
-      )}
-
-      {/* Search and Filter Section */}
-      <div style={styles.card}>
-        <div style={{display: 'flex', alignItems: 'center', gap: '15px', flexWrap: 'wrap'}}>
-          <div style={{flex: 1, minWidth: '300px'}}>
-            <div style={{position: 'relative'}}>
-              <input
-                type="text"
-                placeholder="Search blogs by title, content, tags, or author..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                style={{
-                  width: '100%',
-                  padding: '10px 10px 10px 35px',
-                  border: '1px solid #ddd',
-                  borderRadius: '4px',
-                  fontSize: '14px'
-                }}
-              />
-              <span style={{
-                position: 'absolute',
-                left: '10px',
-                top: '50%',
-                transform: 'translateY(-50%)',
-                color: '#6c757d'
-              }}>
-                🔍
-              </span>
-              {/* 🟢 ADDED: Clear search button when there's text */}
-              {searchTerm && (
-                <button
-                  onClick={() => setSearchTerm('')}
-                  style={{
-                    position: 'absolute',
-                    right: '10px',
-                    top: '50%',
-                    transform: 'translateY(-50%)',
-                    background: 'none',
-                    border: 'none',
-                    color: '#6c757d',
-                    cursor: 'pointer',
-                    fontSize: '16px'
-                  }}
-                  title="Clear search"
+        ) : (
+          <>
+            {currentBlogs.map(blog => (
+              <div key={blog.id} style={styles.blogCard}>
+                <div style={styles.blogContent}>
+                  <div style={styles.blogHeader}>
+                    <h3 style={styles.blogTitle}>{blog.title}</h3>
+                    <span style={{
+                      ...styles.status,
+                      ...(blog.status === 'published' ? styles.statusPublished : styles.statusDraft)
+                    }}>
+                      {blog.status}
+                    </span>
+                  </div>
+                  
+                  <p style={styles.blogExcerpt}>{blog.excerpt}</p>
+                  
+                  <div style={styles.blogMeta}>
+                    <div style={styles.blogTags}>
+                      {blog.tags.map((tag, index) => (
+                        <span key={index} style={styles.tag}>{tag}</span>
+                      ))}
+                    </div>
+                    <div style={styles.blogInfo}>
+                      <span style={styles.blogAuthor}>By {blog.author}</span>
+                      <span style={styles.blogDate}>{formatDate(blog.createdAt)}</span>
+                    </div>
+                  </div>
+                  
+                  <div style={styles.blogActions}>
+                    <button 
+                      style={styles.actionButton}
+                      onClick={() => handleEdit(blog.id)}
+                    >
+                      Edit
+                    </button>
+                    <button 
+                      style={{
+                        ...styles.actionButton,
+                        ...styles.publishButton
+                      }}
+                      onClick={() => handlePublish(blog.id)}
+                    >
+                      {blog.status === 'draft' ? 'Publish' : 'Unpublish'}
+                    </button>
+                    <div style={styles.blogStats}>
+                      <span style={styles.stat}>👁 {blog.views}</span>
+                      <span style={styles.stat}>💬 {blog.comments}</span>
+                      <span style={styles.stat}>❤️ {blog.likes}</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            ))}
+            
+            {/* Pagination */}
+            {totalPages > 1 && (
+              <div style={styles.pagination}>
+                <button 
+                  style={styles.pageButton}
+                  onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                  disabled={currentPage === 1}
                 >
-                  ✕
+                  ← Previous
                 </button>
-              )}
-            </div>
-          </div>
-          <div style={{display: 'flex', gap: '8px', flexWrap: 'wrap'}}>
-            <button
-              style={{
-                padding: '6px 12px',
-                border: `1px solid ${searchTerm === '' ? '#007bff' : '#6c757d'}`,
-                backgroundColor: searchTerm === '' ? '#007bff' : 'transparent',
-                color: searchTerm === '' ? 'white' : '#6c757d',
-                borderRadius: '4px',
-                cursor: 'pointer',
-                fontSize: '12px'
-              }}
-              onClick={() => setSearchTerm('')}
-            >
-              All ({blogs.length})
-            </button>
-            <button
-              style={{
-                padding: '6px 12px',
-                border: `1px solid ${searchTerm === 'published' ? '#28a745' : '#28a745'}`,
-                backgroundColor: searchTerm === 'published' ? '#28a745' : 'transparent',
-                color: searchTerm === 'published' ? 'white' : '#28a745',
-                borderRadius: '4px',
-                cursor: 'pointer',
-                fontSize: '12px'
-              }}
-              onClick={() => setSearchTerm('published')}
-            >
-              Published ({blogs.filter(b => b.published).length})
-            </button>
-            <button
-              style={{
-                padding: '6px 12px',
-                border: `1px solid ${searchTerm === 'draft' ? '#ffc107' : '#ffc107'}`,
-                backgroundColor: searchTerm === 'draft' ? '#ffc107' : 'transparent',
-                color: searchTerm === 'draft' ? 'black' : '#856404',
-                borderRadius: '4px',
-                cursor: 'pointer',
-                fontSize: '12px'
-              }}
-              onClick={() => setSearchTerm('draft')}
-            >
-              Drafts ({blogs.filter(b => !b.published).length})
-            </button>
-          </div>
-        </div>
+                
+                <div style={styles.pageNumbers}>
+                  {Array.from({ length: totalPages }, (_, i) => i + 1).map(page => (
+                    <button
+                      key={page}
+                      style={{
+                        ...styles.pageNumber,
+                        ...(currentPage === page && styles.pageNumberActive)
+                      }}
+                      onClick={() => setCurrentPage(page)}
+                    >
+                      {page}
+                    </button>
+                  ))}
+                </div>
+                
+                <button 
+                  style={styles.pageButton}
+                  onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+                  disabled={currentPage === totalPages}
+                >
+                  Next →
+                </button>
+              </div>
+            )}
+          </>
+        )}
       </div>
-
-      {/* Blog Posts Table */}
-      {filteredBlogs.length > 0 ? (
-        <div style={styles.card}>
-          <div style={{overflowX: 'auto'}}>
-            <table style={styles.table}>
-              <thead>
-                <tr style={{borderBottom: '2px solid #dee2e6'}}>
-                  <th style={{padding: '12px', textAlign: 'left', fontWeight: 'bold'}}>Title</th>
-                  <th style={{padding: '12px', textAlign: 'left', fontWeight: 'bold'}}>Author</th>
-                  <th style={{padding: '12px', textAlign: 'left', fontWeight: 'bold'}}>Status</th>
-                  <th style={{padding: '12px', textAlign: 'left', fontWeight: 'bold'}}>Created</th>
-                  <th style={{padding: '12px', textAlign: 'left', fontWeight: 'bold'}}>Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {filteredBlogs.map(blog => (
-                  <tr key={blog._id} style={{borderBottom: '1px solid #dee2e6'}}>
-                    <td style={{padding: '12px'}}>
-                      <div>
-                        <strong>{blog.title || 'Untitled Blog'}</strong>
-                        {blog.excerpt && (
-                          <div style={{color: '#6c757d', fontSize: '12px', marginTop: '4px'}}>
-                            {blog.excerpt.length > 100 ? blog.excerpt.substring(0, 100) + '...' : blog.excerpt}
-                          </div>
-                        )}
-                        {blog.tags && blog.tags.length > 0 && (
-                          <div style={{color: '#6c757d', fontSize: '12px', marginTop: '4px'}}>
-                            Tags: {blog.tags.slice(0, 3).join(', ')}
-                            {blog.tags.length > 3 && ` +${blog.tags.length - 3} more`}
-                          </div>
-                        )}
-                      </div>
-                    </td>
-                    <td style={{padding: '12px'}}>{blog.author || 'Admin'}</td>
-                    <td style={{padding: '12px'}}>
-                      {blog.published ? (
-                        <span style={{...styles.badge, ...styles.badgeSuccess}}>Published</span>
-                      ) : (
-                        <span style={{...styles.badge, ...styles.badgeWarning}}>Draft</span>
-                      )}
-                    </td>
-                    <td style={{padding: '12px'}}>{formatDate(blog.createdAt)}</td>
-                    <td style={{padding: '12px'}}>
-                      <div style={{display: 'flex', gap: '8px'}}>
-                        <Link
-                          to={`/blogs/edit/${blog._id}`}
-                          style={{
-                            padding: '6px 12px',
-                            backgroundColor: '#007bff',
-                            color: 'white',
-                            textDecoration: 'none',
-                            borderRadius: '4px',
-                            fontSize: '12px'
-                          }}
-                        >
-                          Edit
-                        </Link>
-                        <Link
-                          to={`/blogs/view/${blog._id}`}
-                          style={{
-                            padding: '6px 12px',
-                            backgroundColor: '#17a2b8',
-                            color: 'white',
-                            textDecoration: 'none',
-                            borderRadius: '4px',
-                            fontSize: '12px'
-                          }}
-                        >
-                          View
-                        </Link>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      ) : (
-        <div style={{...styles.card, textAlign: 'center', padding: '40px'}}>
-          <div style={{color: '#6c757d'}}>
-            <div style={{fontSize: '48px', marginBottom: '16px'}}>📄</div>
-            <h4>No blogs found</h4>
-            <p>
-              {searchTerm 
-                ? 'No blogs match your search criteria.' 
-                : 'No blogs have been created yet.'}
-            </p>
-            <p style={{color: '#dc3545', fontSize: '14px', marginTop: '12px'}}>
-              <strong>Debug Info:</strong> Using mock data. Create real API services to connect to your backend.
-            </p>
-            <Link 
-              to="/blogs/create" 
-              style={{
-                display: 'inline-block',
-                padding: '10px 20px',
-                backgroundColor: '#007bff',
-                color: 'white',
-                textDecoration: 'none',
-                borderRadius: '4px',
-                marginTop: '8px'
-              }}
-            >
-              ➕ Create Your First Blog
-            </Link>
-          </div>
-        </div>
-      )}
     </div>
   );
 };
+
+const styles = {
+  container: {
+    padding: '20px',
+    background: '#f8f9fa',
+    minHeight: '100vh'
+  },
+  loading: {
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'center',
+    justifyContent: 'center',
+    height: '400px'
+  },
+  spinner: {
+    width: '40px',
+    height: '40px',
+    border: '3px solid #f3f3f3',
+    borderTop: '3px solid #007bff',
+    borderRadius: '50%',
+    animation: 'spin 1s linear infinite',
+    marginBottom: '20px'
+  },
+  header: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: '30px',
+    flexWrap: 'wrap',
+    gap: '20px'
+  },
+  title: {
+    margin: '0',
+    color: '#333',
+    fontSize: '28px',
+    fontWeight: '600'
+  },
+  subtitle: {
+    margin: '5px 0 0 0',
+    color: '#666',
+    fontSize: '14px'
+  },
+  headerActions: {
+    display: 'flex',
+    gap: '10px',
+    flexWrap: 'wrap'
+  },
+  createButton: {
+    padding: '10px 20px',
+    background: '#007bff',
+    color: 'white',
+    border: 'none',
+    borderRadius: '6px',
+    cursor: 'pointer',
+    fontSize: '14px',
+    fontWeight: '500',
+    transition: 'all 0.3s ease'
+  },
+  viewButton: {
+    padding: '10px 20px',
+    background: '#e9ecef',
+    color: '#333',
+    border: 'none',
+    borderRadius: '6px',
+    cursor: 'pointer',
+    fontSize: '14px',
+    fontWeight: '500',
+    transition: 'all 0.3s ease'
+  },
+  stats: {
+    display: 'flex',
+    gap: '15px',
+    marginBottom: '30px',
+    flexWrap: 'wrap'
+  },
+  statCard: {
+    background: 'white',
+    padding: '20px',
+    borderRadius: '8px',
+    boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
+    minWidth: '120px',
+    textAlign: 'center',
+    flex: '1'
+  },
+  statNumber: {
+    fontSize: '32px',
+    fontWeight: '700',
+    color: '#333',
+    marginBottom: '5px'
+  },
+  statLabel: {
+    fontSize: '14px',
+    color: '#666'
+  },
+  statPublished: {
+    borderLeft: '4px solid #28a745'
+  },
+  statDraft: {
+    borderLeft: '4px solid #ffc107'
+  },
+  filters: {
+    background: 'white',
+    padding: '20px',
+    borderRadius: '8px',
+    boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
+    marginBottom: '20px',
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    flexWrap: 'wrap',
+    gap: '20px'
+  },
+  searchContainer: {
+    flex: '1',
+    minWidth: '200px'
+  },
+  searchInput: {
+    width: '100%',
+    padding: '10px 15px',
+    border: '1px solid #ddd',
+    borderRadius: '6px',
+    fontSize: '14px'
+  },
+  filterTabs: {
+    display: 'flex',
+    gap: '10px',
+    flexWrap: 'wrap'
+  },
+  filterTab: {
+    padding: '8px 16px',
+    border: '1px solid #ddd',
+    background: 'white',
+    borderRadius: '4px',
+    cursor: 'pointer',
+    fontSize: '14px',
+    transition: 'all 0.3s ease'
+  },
+  filterTabActive: {
+    background: '#007bff',
+    color: 'white',
+    borderColor: '#007bff'
+  },
+  blogList: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '15px'
+  },
+  blogCard: {
+    background: 'white',
+    borderRadius: '8px',
+    boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
+    overflow: 'hidden'
+  },
+  blogContent: {
+    padding: '20px'
+  },
+  blogHeader: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    marginBottom: '10px'
+  },
+  blogTitle: {
+    margin: '0',
+    fontSize: '18px',
+    fontWeight: '600',
+    color: '#333',
+    flex: '1'
+  },
+  status: {
+    padding: '4px 12px',
+    borderRadius: '12px',
+    fontSize: '12px',
+    fontWeight: '600',
+    marginLeft: '10px'
+  },
+  statusPublished: {
+    background: '#d4edda',
+    color: '#155724'
+  },
+  statusDraft: {
+    background: '#fff3cd',
+    color: '#856404'
+  },
+  blogExcerpt: {
+    margin: '0 0 15px 0',
+    color: '#666',
+    fontSize: '14px',
+    lineHeight: '1.5'
+  },
+  blogMeta: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: '15px',
+    flexWrap: 'wrap',
+    gap: '10px'
+  },
+  blogTags: {
+    display: 'flex',
+    gap: '5px',
+    flexWrap: 'wrap'
+  },
+  tag: {
+    background: '#e9ecef',
+    color: '#495057',
+    padding: '2px 8px',
+    borderRadius: '12px',
+    fontSize: '12px'
+  },
+  blogInfo: {
+    display: 'flex',
+    gap: '15px',
+    fontSize: '13px',
+    color: '#666'
+  },
+  blogActions: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    flexWrap: 'wrap',
+    gap: '10px'
+  },
+  actionButton: {
+    padding: '6px 12px',
+    background: '#007bff',
+    color: 'white',
+    border: 'none',
+    borderRadius: '4px',
+    cursor: 'pointer',
+    fontSize: '13px',
+    transition: 'all 0.3s ease'
+  },
+  publishButton: {
+    background: '#28a745'
+  },
+  blogStats: {
+    display: 'flex',
+    gap: '15px',
+    fontSize: '13px',
+    color: '#666'
+  },
+  stat: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '5px'
+  },
+  emptyState: {
+    textAlign: 'center',
+    padding: '60px 20px',
+    background: 'white',
+    borderRadius: '8px',
+    boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
+  },
+  emptyIcon: {
+    fontSize: '60px',
+    marginBottom: '20px'
+  },
+  pagination: {
+    display: 'flex',
+    justifyContent: 'center',
+    alignItems: 'center',
+    gap: '10px',
+    marginTop: '30px',
+    paddingTop: '20px',
+    borderTop: '1px solid #eee'
+  },
+  pageButton: {
+    padding: '8px 16px',
+    border: '1px solid #ddd',
+    background: 'white',
+    borderRadius: '4px',
+    cursor: 'pointer',
+    fontSize: '14px',
+    transition: 'all 0.3s ease'
+  },
+  pageNumbers: {
+    display: 'flex',
+    gap: '5px'
+  },
+  pageNumber: {
+    width: '36px',
+    height: '36px',
+    border: '1px solid #ddd',
+    background: 'white',
+    borderRadius: '4px',
+    cursor: 'pointer',
+    fontSize: '14px'
+  },
+  pageNumberActive: {
+    background: '#007bff',
+    color: 'white',
+    borderColor: '#007bff'
+  }
+};
+
+// Add spin animation
+const spinStyle = document.createElement('style');
+spinStyle.textContent = `
+  @keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+  }
+`;
+document.head.appendChild(spinStyle);
 
 export default BlogList;
