@@ -1,14 +1,9 @@
-import React from 'react';
+import React, { Component } from 'react';
 
-class ErrorBoundary extends React.Component {
+class ErrorBoundary extends Component {
   constructor(props) {
     super(props);
-    this.state = { 
-      hasError: false, 
-      error: null, 
-      errorInfo: null,
-      retryCount: 0
-    };
+    this.state = { hasError: false, error: null, errorInfo: null };
   }
 
   static getDerivedStateFromError(error) {
@@ -16,26 +11,19 @@ class ErrorBoundary extends React.Component {
   }
 
   componentDidCatch(error, errorInfo) {
+    console.error('ErrorBoundary caught an error:', error, errorInfo);
     this.setState({
       error: error,
       errorInfo: errorInfo
     });
-    
-    // Log error to error reporting service
-    console.error('Error caught by boundary:', error, errorInfo);
-    
-    // Increment retry count
-    this.setState(prevState => ({
-      retryCount: prevState.retryCount + 1
-    }));
   }
 
-  handleRetry = () => {
-    this.setState({
-      hasError: false,
-      error: null,
-      errorInfo: null
-    });
+  handleReload = () => {
+    window.location.reload();
+  };
+
+  handleGoBack = () => {
+    window.history.back();
   };
 
   handleGoHome = () => {
@@ -44,52 +32,47 @@ class ErrorBoundary extends React.Component {
 
   render() {
     if (this.state.hasError) {
-      // If we've retried too many times, show a different message
-      if (this.state.retryCount >= 3) {
-        return (
-          <div className="error-boundary">
-            <div className="error-boundary__content">
-              <h2>Application Error</h2>
-              <p>We're experiencing technical difficulties. Please try again later.</p>
-              <div className="error-boundary__actions">
-                <button 
-                  className="btn btn-primary"
-                  onClick={this.handleGoHome}
-                >
-                  Go to Homepage
-                </button>
-              </div>
-            </div>
-          </div>
-        );
-      }
-
       return (
         <div className="error-boundary">
-          <div className="error-boundary__content">
-            <h2>Something went wrong</h2>
-            <p>We're sorry, but something went wrong. You can try reloading the page.</p>
+          <div className="error-content">
+            <div className="error-icon">🚨</div>
+            <h2 className="error-title">Something went wrong</h2>
+            <p className="error-message">
+              An unexpected error occurred. Our team has been notified.
+            </p>
             
-            {process.env.NODE_ENV === 'development' && (
-              <details className="error-boundary__details">
-                <summary>Error Details (Development)</summary>
-                <pre>{this.state.error && this.state.error.toString()}</pre>
-                <pre>{this.state.errorInfo.componentStack}</pre>
+            {this.state.error && (
+              <details className="error-details">
+                <summary>Error Details</summary>
+                <div className="error-details-content">
+                  <p><strong>Error:</strong> {this.state.error.toString()}</p>
+                  {this.state.errorInfo && (
+                    <pre className="error-stack">
+                      {this.state.errorInfo.componentStack}
+                    </pre>
+                  )}
+                </div>
               </details>
             )}
-            
-            <div className="error-boundary__actions">
-              <button 
-                className="btn btn-primary"
-                onClick={this.handleRetry}
+
+            <div className="error-actions">
+              <button
+                onClick={this.handleReload}
+                className="btn-error btn-primary"
               >
-                Try Again
+                🔄 Reload Page
               </button>
-              <button 
-                className="btn btn-outline"
-                onClick={() => window.location.reload()}
+              <button
+                onClick={this.handleGoBack}
+                className="btn-error btn-secondary"
               >
-                Reload Page
+                ↩️ Go Back
+              </button>
+              <button
+                onClick={this.handleGoHome}
+                className="btn-error btn-outline"
+              >
+                🏠 Go Home
               </button>
             </div>
           </div>

@@ -1,54 +1,63 @@
-// admin-panel/src/App.js - FIXED VERSION
-import React, { Suspense, lazy } from 'react';
+import React, { Suspense, lazy, useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 
 import Layout from './components/layout/Layout';
-import LoadingSpinner from './components/common/LoadingSpinner';
 import ErrorBoundary from './components/common/ErrorBoundary';
 
-// ========== FIXED DASHBOARD IMPORT ==========
-import Dashboard from './components/dashboard/Dashboard'; // Correct path!
-// ============================================
+// Import existing components directly
+import Dashboard from './components/dashboard/Dashboard';
+import BlogList from './components/dashboard/BlogList'; // Keep existing BlogList
+import BlogCreate from './pages/Blogs/BlogCreate'; // Import BlogCreate
+import BlogEditor from './components/dashboard/BlogEditor'; // Import BlogEditor
 
 import './styles/global.css';
 
-// Lazy load other components
-const createLazyComponent = (importFn, componentName) => {
-  return lazy(async () => {
-    try {
-      const module = await importFn();
-      return module;
-    } catch (error) {
-      console.warn(`⚠️ ${componentName} not found`);
-      const FallbackComponent = () => (
-        <div style={{ padding: '40px', textAlign: 'center' }}>
-          <h2>{componentName} Page</h2>
-          <p>This page is under development.</p>
-        </div>
-      );
-      return { default: FallbackComponent };
-    }
-  });
-};
+// Lazy load other pages
+const LoginPage = lazy(() => import('./pages/LoginPage'));
+const ProjectsPage = lazy(() => import('./pages/ProjectsPage'));
 
-// Other pages
-const BlogList = createLazyComponent(() => import('./pages/Blogs/BlogList'), 'BlogList');
-const BlogCreate = createLazyComponent(() => import('./pages/Blogs/BlogCreate'), 'BlogCreate');
-const BlogEdit = createLazyComponent(() => import('./pages/Blogs/BlogEdit'), 'BlogEdit');
-const BlogView = createLazyComponent(() => import('./pages/Blogs/BlogView'), 'BlogView');
-const LoginPage = createLazyComponent(() => import('./pages/LoginPage'), 'LoginPage');
-const ProjectsPage = createLazyComponent(() => import('./pages/ProjectsPage'), 'ProjectsPage');
+// Simple placeholder components for missing pages
+const SettingsPage = () => (
+  <div style={{ padding: '40px', textAlign: 'center' }}>
+    <h2>⚙️ Settings</h2>
+    <p>Settings page is under development.</p>
+    <div style={{ marginTop: '30px', color: '#666' }}>
+      <p>Coming soon:</p>
+      <ul style={{ listStyle: 'none', padding: 0 }}>
+        <li>✅ User Management</li>
+        <li>✅ Site Configuration</li>
+        <li>✅ API Settings</li>
+      </ul>
+    </div>
+  </div>
+);
+
+const AnalyticsPage = () => (
+  <div style={{ padding: '40px', textAlign: 'center' }}>
+    <h2>📈 Analytics</h2>
+    <p>Analytics dashboard is under development.</p>
+    <div style={{ marginTop: '30px', color: '#666' }}>
+      <p>Coming soon:</p>
+      <ul style={{ listStyle: 'none', padding: 0 }}>
+        <li>✅ Blog Views Analytics</li>
+        <li>✅ User Engagement</li>
+        <li>✅ Traffic Sources</li>
+      </ul>
+    </div>
+  </div>
+);
 
 // Route constants
 export const ROUTES = {
-  LOGIN: '/login',
-  DASHBOARD: '/dashboard',
-  BLOGS: '/blogs',
-  BLOGS_CREATE: '/blogs/create',
-  BLOGS_EDIT: '/blogs/edit/:id',
-  BLOGS_VIEW: '/blogs/view/:id',
-  PROJECTS: '/projects',
+  LOGIN: '/admin/login',
+  DASHBOARD: '/admin/dashboard',
+  BLOGS: '/admin/blogs',
+  BLOGS_CREATE: '/admin/blogs/new',
+  BLOGS_EDIT: '/admin/blogs/edit/:id',
+  PROJECTS: '/admin/projects',
+  SETTINGS: '/admin/settings',
+  ANALYTICS: '/admin/analytics',
 };
 
 // Loading components
@@ -61,7 +70,14 @@ const PageLoader = ({ message = "Loading..." }) => (
     flexDirection: 'column',
     gap: '20px'
   }}>
-    <LoadingSpinner size="large" />
+    <div style={{ 
+      width: '40px', 
+      height: '40px', 
+      border: '3px solid #f3f3f3',
+      borderTop: '3px solid #667eea',
+      borderRadius: '50%',
+      animation: 'spin 1s linear infinite'
+    }}></div>
     <div style={{ color: '#666', fontSize: '16px' }}>{message}</div>
   </div>
 );
@@ -71,9 +87,27 @@ const AuthLoader = () => (
     display: 'flex', 
     justifyContent: 'center', 
     alignItems: 'center', 
-    height: '100vh' 
+    height: '100vh',
+    backgroundColor: '#f8f9fa'
   }}>
-    <LoadingSpinner size="large" message="Checking authentication..." />
+    <div style={{ textAlign: 'center' }}>
+      <div style={{ 
+        width: '60px', 
+        height: '60px', 
+        border: '4px solid #f3f3f3',
+        borderTop: '4px solid #667eea',
+        borderRadius: '50%',
+        animation: 'spin 1s linear infinite',
+        margin: '0 auto 20px'
+      }}></div>
+      <div style={{ 
+        color: '#666', 
+        fontSize: '16px',
+        maxWidth: '300px'
+      }}>
+        Checking authentication...
+      </div>
+    </div>
   </div>
 );
 
@@ -85,10 +119,15 @@ const ProtectedRoute = ({ children }) => {
     return <AuthLoader />;
   }
 
-  return isAuthenticated ? children : <Navigate to={ROUTES.LOGIN} replace />;
+  if (!isAuthenticated) {
+    console.log('🚫 Not authenticated, redirecting to login');
+    return <Navigate to={ROUTES.LOGIN} replace />;
+  }
+
+  return children;
 };
 
-// Public Route Component
+// Public Route Component (for login page)
 const PublicRoute = ({ children }) => {
   const { isAuthenticated, loading } = useAuth();
 
@@ -96,20 +135,50 @@ const PublicRoute = ({ children }) => {
     return <AuthLoader />;
   }
 
-  return !isAuthenticated ? children : <Navigate to={ROUTES.DASHBOARD} replace />;
+  if (isAuthenticated) {
+    console.log('✅ Already authenticated, redirecting to dashboard');
+    return <Navigate to={ROUTES.DASHBOARD} replace />;
+  }
+
+  return children;
 };
 
 // Main App Component
 const AppContent = () => {
+  const { loading } = useAuth();
+
+  // Add spin animation on component mount
+  useEffect(() => {
+    const style = document.createElement('style');
+    style.textContent = `
+      @keyframes spin {
+        0% { transform: rotate(0deg); }
+        100% { transform: rotate(360deg); }
+      }
+    `;
+    document.head.appendChild(style);
+
+    // Cleanup function
+    return () => {
+      if (document.head.contains(style)) {
+        document.head.removeChild(style);
+      }
+    };
+  }, []);
+
+  if (loading) {
+    return <AuthLoader />;
+  }
+
   return (
     <Router>
       <Routes>
-        {/* Login Route */}
+        {/* Login Route - Public */}
         <Route 
           path={ROUTES.LOGIN} 
           element={
             <PublicRoute>
-              <Suspense fallback={<PageLoader message="Loading login..." />}>
+              <Suspense fallback={<PageLoader message="Loading login page..." />}>
                 <LoginPage />
               </Suspense>
             </PublicRoute>
@@ -130,61 +199,42 @@ const AppContent = () => {
           } 
         />
 
-        {/* Blog Routes */}
+        {/* Blog List Route */}
         <Route 
           path={ROUTES.BLOGS} 
           element={
             <ProtectedRoute>
               <Layout>
                 <ErrorBoundary>
-                  <Suspense fallback={<PageLoader message="Loading blog list..." />}>
-                    <BlogList />
-                  </Suspense>
+                  <BlogList />
                 </ErrorBoundary>
               </Layout>
             </ProtectedRoute>
           } 
         />
 
+        {/* Blog Create Route */}
         <Route 
           path={ROUTES.BLOGS_CREATE} 
           element={
             <ProtectedRoute>
               <Layout>
                 <ErrorBoundary>
-                  <Suspense fallback={<PageLoader message="Loading blog editor..." />}>
-                    <BlogCreate />
-                  </Suspense>
+                  <BlogCreate />
                 </ErrorBoundary>
               </Layout>
             </ProtectedRoute>
           } 
         />
 
+        {/* Blog Edit Route */}
         <Route 
           path={ROUTES.BLOGS_EDIT} 
           element={
             <ProtectedRoute>
               <Layout>
                 <ErrorBoundary>
-                  <Suspense fallback={<PageLoader message="Loading blog editor..." />}>
-                    <BlogEdit />
-                  </Suspense>
-                </ErrorBoundary>
-              </Layout>
-            </ProtectedRoute>
-          } 
-        />
-
-        <Route 
-          path={ROUTES.BLOGS_VIEW} 
-          element={
-            <ProtectedRoute>
-              <Layout>
-                <ErrorBoundary>
-                  <Suspense fallback={<PageLoader message="Loading blog..." />}>
-                    <BlogView />
-                  </Suspense>
+                  <BlogEditor />
                 </ErrorBoundary>
               </Layout>
             </ProtectedRoute>
@@ -207,8 +257,45 @@ const AppContent = () => {
           } 
         />
 
+        {/* Settings Route */}
+        <Route 
+          path={ROUTES.SETTINGS} 
+          element={
+            <ProtectedRoute>
+              <Layout>
+                <ErrorBoundary>
+                  <SettingsPage />
+                </ErrorBoundary>
+              </Layout>
+            </ProtectedRoute>
+          } 
+        />
+
+        {/* Analytics Route */}
+        <Route 
+          path={ROUTES.ANALYTICS} 
+          element={
+            <ProtectedRoute>
+              <Layout>
+                <ErrorBoundary>
+                  <AnalyticsPage />
+                </ErrorBoundary>
+              </Layout>
+            </ProtectedRoute>
+          } 
+        />
+
         {/* Default routes */}
         <Route path="/" element={<Navigate to={ROUTES.DASHBOARD} replace />} />
+        
+        {/* Admin routes - redirect to dashboard */}
+        <Route path="/admin" element={<Navigate to={ROUTES.DASHBOARD} replace />} />
+        
+        {/* Blog public routes (if any) */}
+        <Route path="/blog/:id" element={<div>Public Blog View</div>} />
+        <Route path="/blogs" element={<div>Public Blogs List</div>} />
+        
+        {/* 404 - This MUST BE THE VERY LAST ROUTE */}
         <Route path="*" element={<Navigate to={ROUTES.DASHBOARD} replace />} />
       </Routes>
     </Router>
@@ -218,9 +305,13 @@ const AppContent = () => {
 // Main App Component with AuthProvider
 const App = () => {
   return (
-    <AuthProvider>
-      <AppContent />
-    </AuthProvider>
+    <div className="app-container">
+      <ErrorBoundary>
+        <AuthProvider>
+          <AppContent />
+        </AuthProvider>
+      </ErrorBoundary>
+    </div>
   );
 };
 

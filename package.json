@@ -9,22 +9,21 @@
     "@testing-library/react": "^16.3.0",
     "@testing-library/user-event": "^13.5.0",
     "axios": "^1.12.2",
-    "http-proxy-middleware": "^2.0.6",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
     "react-grid-layout": "^1.5.2",
     "react-quill": "^2.0.0",
     "react-resizable": "^3.0.5",
-    "react-router-dom": "^6.8.0",
+    "react-router-dom": "^6.30.2",
     "react-scripts": "5.0.1",
+    "react-toastify": "^11.0.5",
     "web-vitals": "^2.1.4"
   },
   "scripts": {
     "start": "react-scripts start",
-    "build": "react-scripts build",
+    "build": "CI=false GENERATE_SOURCEMAP=false react-scripts build",
     "test": "react-scripts test",
-    "eject": "react-scripts eject",
-    "dev": "react-scripts start"
+    "eject": "react-scripts eject"
   },
   "eslintConfig": {
     "extends": [
@@ -45,7 +44,6 @@
     ]
   },
   "devDependencies": {
-    "concurrently": "^8.2.2",
     "cross-env": "^7.0.3"
   },
   "engines": {
