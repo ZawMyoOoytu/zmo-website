@@ -1,1188 +1,698 @@
-// src/components/dashboard/BlogList.js - ENHANCED VERSION
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+// src/components/dashboard/BlogList.js - FIXED VERSION
+import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import debounce from 'lodash/debounce';
+import { blogService } from '../../services/blogService';
+import './BlogList.css';
 
 const BlogList = () => {
+  const navigate = useNavigate();
   const [blogs, setBlogs] = useState([]);
+  const [filteredBlogs, setFilteredBlogs] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
-  const [currentPage, setCurrentPage] = useState(1);
-  const [sortBy, setSortBy] = useState('createdAt');
-  const [sortOrder, setSortOrder] = useState('desc');
-  const navigate = useNavigate();
-  
-  const blogsPerPage = 10;
+  const [page, setPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [blogToDelete, setBlogToDelete] = useState(null);
+  const [showVisibilityModal, setShowVisibilityModal] = useState(false);
+  const [blogToToggle, setBlogToToggle] = useState(null);
+  const [selectedBlogs, setSelectedBlogs] = useState([]);
+  const [stats, setStats] = useState({
+    total: 0,
+    published: 0,
+    drafts: 0,
+    visible: 0,
+    hidden: 0
+  });
 
-  // Enhanced mock data with more realistic content
-  const mockBlogs = [
-    {
-      id: 1,
-      title: 'Getting Started with React',
-      excerpt: 'Learn how to build modern web applications with React, including hooks, state management, and component architecture...',
-      category: 'technology',
-      tags: ['react', 'javascript', 'webdev', 'frontend'],
-      status: 'published',
-      featured: true,
-      author: 'John Doe',
-      views: 1234,
-      comments: 42,
-      likes: 89,
-      createdAt: '2023-10-15',
-      updatedAt: '2023-10-20',
-      readTime: '5 min'
-    },
-    {
-      id: 2,
-      title: 'Advanced JavaScript Patterns',
-      excerpt: 'Explore advanced JavaScript patterns and best practices for writing clean, maintainable code...',
-      category: 'tutorial',
-      tags: ['javascript', 'patterns', 'programming', 'es6'],
-      status: 'draft',
-      featured: false,
-      author: 'Jane Smith',
-      views: 0,
-      comments: 0,
-      likes: 0,
-      createdAt: '2023-10-18',
-      updatedAt: '2023-10-18',
-      readTime: '8 min'
-    },
-    {
-      id: 3,
-      title: 'CSS Grid vs Flexbox',
-      excerpt: 'A comprehensive comparison of CSS Grid and Flexbox layout systems with practical examples...',
-      category: 'design',
-      tags: ['css', 'grid', 'flexbox', 'layout'],
-      status: 'published',
-      featured: true,
-      author: 'Alex Johnson',
-      views: 845,
-      comments: 23,
-      likes: 56,
-      createdAt: '2023-10-10',
-      updatedAt: '2023-10-12',
-      readTime: '6 min'
-    },
-    {
-      id: 4,
-      title: 'Introduction to Next.js',
-      excerpt: 'Discover the power of Next.js for server-side rendering, static generation, and API routes...',
-      category: 'framework',
-      tags: ['nextjs', 'react', 'ssr', 'seo'],
-      status: 'published',
-      featured: false,
-      author: 'Sarah Wilson',
-      views: 1567,
-      comments: 67,
-      likes: 124,
-      createdAt: '2023-10-05',
-      updatedAt: '2023-10-08',
-      readTime: '10 min'
-    },
-    {
-      id: 5,
-      title: 'State Management with Redux Toolkit',
-      excerpt: 'Modern state management techniques using Redux Toolkit for scalable applications...',
-      category: 'tutorial',
-      tags: ['redux', 'state-management', 'react', 'toolkit'],
-      status: 'draft',
-      featured: false,
-      author: 'Mike Chen',
-      views: 0,
-      comments: 0,
-      likes: 0,
-      createdAt: '2023-10-22',
-      updatedAt: '2023-10-22',
-      readTime: '12 min'
-    }
-  ];
-
-  // Fetch blogs with error handling
-  useEffect(() => {
-    const fetchBlogs = async () => {
-      try {
-        setLoading(true);
-        setError(null);
+  // Load blogs from API
+  const loadBlogs = useCallback(async () => {
+    try {
+      setLoading(true);
+      console.log('🔍 Loading blogs from API...');
+      
+      const response = await blogService.getBlogs();
+      console.log('📦 API response:', response);
+      
+      if (response.success && response.data) {
+        const blogsData = response.data.map(blog => {
+          // Debug: Log the blog data structure
+          console.log('📝 Blog data:', blog);
+          
+          // Check for published status in various possible fields
+          const isPublished = 
+            blog.isPublished === true || 
+            blog.published === true || 
+            blog.status === 'published' ||
+            blog.status === 'Published';
+          
+          // Default to visible if published, otherwise hidden for drafts
+          const isVisible = blog.isVisible !== undefined 
+            ? blog.isVisible 
+            : isPublished; // Auto-visible if published
+          
+          // Format date
+          let formattedDate = 'No date';
+          if (blog.createdAt) {
+            try {
+              const date = new Date(blog.createdAt);
+              if (!isNaN(date.getTime())) {
+                formattedDate = date.toLocaleDateString('en-US', {
+                  month: 'short',
+                  day: 'numeric',
+                  year: 'numeric'
+                });
+              }
+            } catch (dateError) {
+              console.error('Date parsing error:', dateError);
+            }
+          }
+          
+          return {
+            ...blog,
+            _id: blog._id || blog.id, // Handle both _id and id
+            isPublished: isPublished,
+            isVisible: isVisible,
+            formattedDate: formattedDate,
+            // Add excerpt if missing
+            excerpt: blog.excerpt || blog.description || blog.content?.substring(0, 150) + '...' || 'No description'
+          };
+        });
         
-        // Simulate API call with delay
-        await new Promise(resolve => setTimeout(resolve, 800));
+        console.log(`📥 Loaded ${blogsData.length} blogs`);
+        console.log('📊 Processed blogs:', blogsData.map(b => ({
+          title: b.title,
+          isPublished: b.isPublished,
+          isVisible: b.isVisible,
+          _id: b._id
+        })));
         
-        // In real app, fetch from API:
-        // const response = await fetch('/api/blogs');
-        // const data = await response.json();
-        // setBlogs(data);
-        
-        setBlogs(mockBlogs);
-      } catch (err) {
-        console.error('Error fetching blogs:', err);
-        setError('Failed to load blogs. Please try again.');
-      } finally {
-        setLoading(false);
+        setBlogs(blogsData);
+        updateStats(blogsData);
+      } else {
+        console.error('❌ API returned error:', response);
+        setBlogs([]);
       }
-    };
-
-    fetchBlogs();
+    } catch (error) {
+      console.error('❌ Error loading blogs:', error);
+      setBlogs([]);
+    } finally {
+      setLoading(false);
+    }
   }, []);
 
-  // Debounced search handler
-  const debouncedSearch = useCallback(
-    debounce((value) => {
-      setSearchTerm(value);
-      setCurrentPage(1); // Reset to first page on search
-    }, 300),
-    []
-  );
-
-  const handleSearchChange = (e) => {
-    debouncedSearch(e.target.value);
+  // Update statistics
+  const updateStats = (blogsData) => {
+    const total = blogsData.length;
+    const published = blogsData.filter(b => b.isPublished).length;
+    const drafts = total - published;
+    const visible = blogsData.filter(b => b.isVisible).length;
+    const hidden = total - visible;
+    
+    console.log('📈 Stats calculated:', { total, published, drafts, visible, hidden });
+    
+    setStats({ total, published, drafts, visible, hidden });
   };
 
-  // Filter and sort blogs with useMemo for performance
-  const filteredBlogs = useMemo(() => {
-    return blogs
-      .filter(blog => {
-        const matchesSearch = 
-          blog.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          blog.excerpt.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          blog.tags.some(tag => tag.toLowerCase().includes(searchTerm.toLowerCase())) ||
-          blog.author.toLowerCase().includes(searchTerm.toLowerCase());
-        
-        const matchesStatus = statusFilter === 'all' || blog.status === statusFilter;
-        
-        return matchesSearch && matchesStatus;
-      })
-      .sort((a, b) => {
-        const aValue = a[sortBy];
-        const bValue = b[sortBy];
-        
-        if (sortOrder === 'asc') {
-          return aValue > bValue ? 1 : -1;
-        } else {
-          return aValue < bValue ? 1 : -1;
-        }
-      });
-  }, [blogs, searchTerm, statusFilter, sortBy, sortOrder]);
-
-  // Pagination calculations
-  const paginatedBlogs = useMemo(() => {
-    const indexOfLastBlog = currentPage * blogsPerPage;
-    const indexOfFirstBlog = indexOfLastBlog - blogsPerPage;
-    return filteredBlogs.slice(indexOfFirstBlog, indexOfLastBlog);
-  }, [filteredBlogs, currentPage]);
-
-  const totalPages = Math.ceil(filteredBlogs.length / blogsPerPage);
-
-  // Format date with better error handling
-  const formatDate = (dateString) => {
-    try {
-      const date = new Date(dateString);
-      return date.toLocaleDateString('en-US', {
-        year: 'numeric',
-        month: 'short',
-        day: 'numeric'
-      });
-    } catch (error) {
-      return 'Invalid date';
+  // Filter blogs
+  useEffect(() => {
+    let filtered = [...blogs];
+    
+    // Search filter
+    if (searchTerm) {
+      const term = searchTerm.toLowerCase();
+      filtered = filtered.filter(blog => 
+        blog.title?.toLowerCase().includes(term) ||
+        blog.excerpt?.toLowerCase().includes(term) ||
+        blog.category?.toLowerCase().includes(term) ||
+        (blog.tags && blog.tags.some(tag => tag.toLowerCase().includes(term)))
+      );
     }
-  };
-
-  // Handle sort
-  const handleSort = (field) => {
-    if (sortBy === field) {
-      setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc');
-    } else {
-      setSortBy(field);
-      setSortOrder('desc');
+    
+    // Status filter
+    if (statusFilter !== 'all') {
+      filtered = filtered.filter(blog => {
+        if (statusFilter === 'published') return blog.isPublished;
+        if (statusFilter === 'drafts') return !blog.isPublished;
+        if (statusFilter === 'visible') return blog.isVisible;
+        if (statusFilter === 'hidden') return !blog.isVisible;
+        return true;
+      });
     }
-    setCurrentPage(1);
-  };
+    
+    setFilteredBlogs(filtered);
+  }, [blogs, searchTerm, statusFilter]);
 
-  // Navigation handlers
-  const handleEdit = (blogId) => {
-    navigate(`/admin/blogs/edit/${blogId}`);
-  };
+  // Load blogs on component mount
+  useEffect(() => {
+    loadBlogs();
+  }, [loadBlogs]);
 
-  const handleView = (blogId) => {
-    navigate(`/blog/${blogId}`);
-  };
-
-  const handleCreate = () => {
-    navigate('/admin/blogs/new');
-  };
-
-  const handleViewPublic = () => {
-    window.open('/blog', '_blank');
-  };
-
-  const handlePublish = async (blogId) => {
+  // DELETE BLOG
+  const handleDelete = async (blogId) => {
     try {
-      // In real app, make API call:
-      // await fetch(`/api/blogs/${blogId}/publish`, { method: 'PUT' });
+      console.log(`🗑️ Deleting blog ${blogId}`);
       
-      setBlogs(blogs.map(blog => 
-        blog.id === blogId 
-          ? { 
-              ...blog, 
-              status: blog.status === 'published' ? 'draft' : 'published',
-              updatedAt: new Date().toISOString().split('T')[0]
-            }
-          : blog
-      ));
-    } catch (err) {
-      console.error('Error updating blog status:', err);
-    }
-  };
-
-  const handleDelete = (blogId) => {
-    if (window.confirm('Are you sure you want to delete this blog post?')) {
-      setBlogs(blogs.filter(blog => blog.id !== blogId));
-      // Reset to first page if no blogs on current page
-      if (paginatedBlogs.length === 1 && currentPage > 1) {
-        setCurrentPage(currentPage - 1);
+      setLoading(true);
+      
+      const response = await blogService.deleteBlog(blogId);
+      console.log('📊 Delete response:', response);
+      
+      if (response.success) {
+        // Remove from local state
+        setBlogs(prev => prev.filter(blog => blog._id !== blogId));
+        setSelectedBlogs(prev => prev.filter(id => id !== blogId));
+        
+        alert('✅ Blog deleted successfully!');
+        
+        // Refresh the list
+        await loadBlogs();
+      } else {
+        alert(`❌ ${response.message}`);
       }
+    } catch (error) {
+      console.error('❌ Error deleting blog:', error);
+      alert(`❌ Error: ${error.message}`);
+    } finally {
+      setLoading(false);
+      setShowDeleteModal(false);
+      setBlogToDelete(null);
     }
   };
 
-  // Reset all filters
-  const handleResetFilters = () => {
-    setSearchTerm('');
-    setStatusFilter('all');
-    setCurrentPage(1);
-    setSortBy('createdAt');
-    setSortOrder('desc');
+  // Toggle visibility
+  const toggleVisibility = async (blogId) => {
+    const blog = blogs.find(b => b._id === blogId);
+    if (!blog) return;
+
+    try {
+      setLoading(true);
+      
+      const updatedBlog = {
+        title: blog.title,
+        content: blog.content,
+        excerpt: blog.excerpt,
+        category: blog.category,
+        tags: blog.tags || [],
+        imageUrl: blog.imageUrl,
+        isPublished: blog.isPublished,
+        isVisible: !blog.isVisible
+      };
+
+      console.log(`🔄 Toggling visibility for ${blogId}:`, updatedBlog);
+      
+      const response = await blogService.updateBlog(blogId, updatedBlog);
+      
+      if (response) {
+        // Update local state
+        setBlogs(prev => prev.map(b => 
+          b._id === blogId ? { ...b, isVisible: !b.isVisible } : b
+        ));
+        
+        alert(`✅ Blog ${blog.isVisible ? 'hidden from' : 'made visible on'} the website!`);
+        
+        // Refresh stats
+        await loadBlogs();
+      }
+    } catch (error) {
+      console.error('❌ Error toggling visibility:', error);
+      alert(`❌ Error: ${error.message}`);
+    } finally {
+      setLoading(false);
+      setShowVisibilityModal(false);
+      setBlogToToggle(null);
+    }
   };
 
-  // Loading and error states
-  if (loading) {
-    return (
-      <div style={styles.loading}>
-        <div style={styles.spinner}></div>
-        <p>Loading blogs...</p>
-      </div>
-    );
-  }
+  // Publish/Unpublish
+  const handlePublish = async (blogId) => {
+    const blog = blogs.find(b => b._id === blogId);
+    if (!blog) return;
 
-  if (error) {
+    try {
+      setLoading(true);
+      
+      const newPublishedStatus = !blog.isPublished;
+      const updatedBlog = {
+        title: blog.title,
+        content: blog.content,
+        excerpt: blog.excerpt,
+        category: blog.category,
+        tags: blog.tags || [],
+        imageUrl: blog.imageUrl,
+        isPublished: newPublishedStatus,
+        // Auto-show when publishing, hide when unpublishing
+        isVisible: newPublishedStatus
+      };
+
+      console.log(`📢 Setting published to ${newPublishedStatus} for ${blogId}`);
+      
+      const response = await blogService.updateBlog(blogId, updatedBlog);
+      
+      if (response) {
+        // Update local state
+        setBlogs(prev => prev.map(b => 
+          b._id === blogId ? { 
+            ...b, 
+            isPublished: newPublishedStatus,
+            isVisible: newPublishedStatus
+          } : b
+        ));
+        
+        alert(`✅ Blog ${newPublishedStatus ? 'published' : 'unpublished'} successfully!`);
+        
+        // Refresh stats
+        await loadBlogs();
+      }
+    } catch (error) {
+      console.error('❌ Error updating publication status:', error);
+      alert(`❌ Error: ${error.message}`);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Select/deselect all
+  const toggleSelectAll = () => {
+    if (selectedBlogs.length === filteredBlogs.length) {
+      setSelectedBlogs([]);
+    } else {
+      setSelectedBlogs(filteredBlogs.map(blog => blog._id));
+    }
+  };
+
+  // Toggle individual selection
+  const toggleBlogSelection = (blogId) => {
+    setSelectedBlogs(prev => 
+      prev.includes(blogId)
+        ? prev.filter(id => id !== blogId)
+        : [...prev, blogId]
+    );
+  };
+
+  // Fix data button (for testing)
+  const fixBlogData = async (blog) => {
+    try {
+      setLoading(true);
+      
+      const updatedBlog = {
+        title: blog.title,
+        content: blog.content,
+        excerpt: blog.excerpt,
+        category: blog.category,
+        tags: blog.tags || [],
+        imageUrl: blog.imageUrl,
+        // Set to published and visible
+        isPublished: true,
+        isVisible: true
+      };
+
+      const response = await blogService.updateBlog(blog._id, updatedBlog);
+      
+      if (response) {
+        alert('✅ Blog data fixed! Now published and visible.');
+        await loadBlogs();
+      }
+    } catch (error) {
+      console.error('❌ Error fixing blog data:', error);
+      alert(`❌ Error: ${error.message}`);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Test fix all blogs
+  const fixAllBlogs = async () => {
+    if (!window.confirm('Fix all blogs to be published and visible?')) return;
+    
+    try {
+      setLoading(true);
+      
+      for (const blog of blogs) {
+        if (!blog.isPublished) {
+          const updatedBlog = {
+            title: blog.title,
+            content: blog.content,
+            excerpt: blog.excerpt,
+            category: blog.category,
+            tags: blog.tags || [],
+            imageUrl: blog.imageUrl,
+            isPublished: true,
+            isVisible: true
+          };
+          
+          await blogService.updateBlog(blog._id, updatedBlog);
+        }
+      }
+      
+      alert('✅ All blogs fixed!');
+      await loadBlogs();
+    } catch (error) {
+      console.error('❌ Error fixing all blogs:', error);
+      alert(`❌ Error: ${error.message}`);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  if (loading && blogs.length === 0) {
     return (
-      <div style={styles.errorContainer}>
-        <div style={styles.errorIcon}>⚠️</div>
-        <h3>Error Loading Blogs</h3>
-        <p>{error}</p>
-        <button 
-          style={styles.retryButton}
-          onClick={() => window.location.reload()}
-        >
-          Retry
-        </button>
+      <div className="blog-list-page">
+        <div className="loading-container">
+          <div className="loading-spinner"></div>
+          <p>Loading blogs...</p>
+        </div>
       </div>
     );
   }
 
   return (
-    <div style={styles.container}>
+    <div className="blog-list-page">
       {/* Header */}
-      <div style={styles.header}>
+      <div className="blog-list-header">
         <div>
-          <h1 style={styles.title}>Blog Posts</h1>
-          <p style={styles.subtitle}>Manage your blog posts and content</p>
+          <h1>Blog Posts</h1>
+          <p>{stats.total} published • {stats.visible} on website</p>
+          <div style={{ marginTop: '10px', display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
+            <button 
+              className="btn btn-warning"
+              onClick={fixAllBlogs}
+              disabled={loading}
+              style={{ fontSize: '12px', padding: '5px 10px' }}
+            >
+              🔧 Fix All Blogs (Publish & Show)
+            </button>
+            <button 
+              className="btn btn-info"
+              onClick={() => console.log('Blogs data:', blogs)}
+              style={{ fontSize: '12px', padding: '5px 10px' }}
+            >
+              📊 Debug Data
+            </button>
+          </div>
         </div>
-        <div style={styles.headerActions}>
-          <button 
-            style={styles.viewButton}
-            onClick={handleViewPublic}
-            title="View public blog"
-          >
-            👁 View Public Blog
-          </button>
-          <button 
-            style={styles.createButton}
-            onClick={handleCreate}
-          >
-            + Create New Blog
-          </button>
+        <button 
+          className="btn btn-primary"
+          onClick={() => navigate('/admin/blogs/new')}
+          disabled={loading}
+        >
+          + Create New Post
+        </button>
+      </div>
+
+      {/* Stats Cards */}
+      <div className="stats-grid">
+        <div className="stat-card">
+          <div className="stat-icon">📊</div>
+          <div className="stat-info">
+            <h3>{stats.total}</h3>
+            <p>Total Posts</p>
+          </div>
+        </div>
+        <div className="stat-card stat-published">
+          <div className="stat-icon">📝</div>
+          <div className="stat-info">
+            <h3>{stats.published}</h3>
+            <p>Published</p>
+          </div>
+        </div>
+        <div className="stat-card stat-draft">
+          <div className="stat-icon">✏️</div>
+          <div className="stat-info">
+            <h3>{stats.drafts}</h3>
+            <p>Drafts</p>
+          </div>
+        </div>
+        <div className="stat-card stat-visible">
+          <div className="stat-icon">👁️</div>
+          <div className="stat-info">
+            <h3>{stats.visible}</h3>
+            <p>Visible on Site</p>
+          </div>
+        </div>
+        <div className="stat-card stat-hidden">
+          <div className="stat-icon">🚫</div>
+          <div className="stat-info">
+            <h3>{stats.hidden}</h3>
+            <p>Hidden</p>
+          </div>
         </div>
       </div>
 
-      {/* Stats */}
-      <div style={styles.stats}>
-        <div style={styles.statCard}>
-          <div style={styles.statNumber}>{blogs.length}</div>
-          <div style={styles.statLabel}>Total Posts</div>
-        </div>
-        <div style={{...styles.statCard, ...styles.statPublished}}>
-          <div style={styles.statNumber}>
-            {blogs.filter(b => b.status === 'published').length}
-          </div>
-          <div style={styles.statLabel}>Published</div>
-        </div>
-        <div style={{...styles.statCard, ...styles.statDraft}}>
-          <div style={styles.statNumber}>
-            {blogs.filter(b => b.status === 'draft').length}
-          </div>
-          <div style={styles.statLabel}>Drafts</div>
-        </div>
-        <div style={{...styles.statCard, ...styles.statFeatured}}>
-          <div style={styles.statNumber}>
-            {blogs.filter(b => b.featured).length}
-          </div>
-          <div style={styles.statLabel}>Featured</div>
-        </div>
-      </div>
-
-      {/* Filters */}
-      <div style={styles.filters}>
-        <div style={styles.searchContainer}>
+      {/* Action Bar */}
+      <div className="action-bar">
+        <div className="search-box">
           <input
             type="text"
-            placeholder="Search by title, content, tags, or author..."
-            defaultValue={searchTerm}
-            onChange={handleSearchChange}
-            style={styles.searchInput}
+            placeholder="Search blogs..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="search-input"
+            disabled={loading}
           />
-          {searchTerm && (
-            <button
-              style={styles.clearSearch}
-              onClick={() => setSearchTerm('')}
-              title="Clear search"
-            >
-              ×
-            </button>
-          )}
+          <span className="search-icon">🔍</span>
         </div>
         
-        <div style={styles.filterControls}>
-          <div style={styles.filterGroup}>
-            <label style={styles.filterLabel}>Status:</label>
-            <div style={styles.filterTabs}>
-              {['all', 'published', 'draft'].map(status => (
-                <button
-                  key={status}
-                  style={{
-                    ...styles.filterTab,
-                    ...(statusFilter === status && styles.filterTabActive)
-                  }}
-                  onClick={() => {
-                    setStatusFilter(status);
-                    setCurrentPage(1);
-                  }}
-                >
-                  {status.charAt(0).toUpperCase() + status.slice(1)}
-                </button>
-              ))}
-            </div>
-          </div>
-          
-          <div style={styles.filterGroup}>
-            <label style={styles.filterLabel}>Sort by:</label>
-            <div style={styles.sortButtons}>
-              <button
-                style={{
-                  ...styles.sortButton,
-                  ...(sortBy === 'createdAt' && styles.sortButtonActive)
-                }}
-                onClick={() => handleSort('createdAt')}
-              >
-                Date {sortBy === 'createdAt' && (sortOrder === 'desc' ? '↓' : '↑')}
-              </button>
-              <button
-                style={{
-                  ...styles.sortButton,
-                  ...(sortBy === 'views' && styles.sortButtonActive)
-                }}
-                onClick={() => handleSort('views')}
-              >
-                Views {sortBy === 'views' && (sortOrder === 'desc' ? '↓' : '↑')}
-              </button>
-              <button
-                style={{
-                  ...styles.sortButton,
-                  ...(sortBy === 'title' && styles.sortButtonActive)
-                }}
-                onClick={() => handleSort('title')}
-              >
-                Title {sortBy === 'title' && (sortOrder === 'desc' ? '↓' : '↑')}
-              </button>
-            </div>
-          </div>
-          
-          {(searchTerm || statusFilter !== 'all' || sortBy !== 'createdAt') && (
-            <button
-              style={styles.resetButton}
-              onClick={handleResetFilters}
-            >
-              Reset Filters
-            </button>
-          )}
+        <div className="filters">
+          <select
+            value={statusFilter}
+            onChange={(e) => setStatusFilter(e.target.value)}
+            className="filter-select"
+            disabled={loading}
+          >
+            <option value="all">All Status</option>
+            <option value="published">Published</option>
+            <option value="drafts">Drafts</option>
+            <option value="visible">Visible</option>
+            <option value="hidden">Hidden</option>
+          </select>
         </div>
       </div>
 
-      {/* Results Info */}
-      <div style={styles.resultsInfo}>
-        <span>
-          Showing {paginatedBlogs.length} of {filteredBlogs.length} blog posts
-          {searchTerm && ` for "${searchTerm}"`}
-        </span>
-        <span style={styles.pageInfo}>
-          Page {currentPage} of {totalPages || 1}
-        </span>
+      {/* Blog Table */}
+      <div className="blog-table-container">
+        <table className="blog-table">
+          <thead>
+            <tr>
+              <th width="40">
+                <input
+                  type="checkbox"
+                  checked={selectedBlogs.length === filteredBlogs.length && filteredBlogs.length > 0}
+                  onChange={toggleSelectAll}
+                  className="select-all-checkbox"
+                  disabled={loading}
+                />
+              </th>
+              <th>Title</th>
+              <th width="120">Status</th>
+              <th width="120">Frontend</th>
+              <th width="120">Created</th>
+              <th width="220">Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {filteredBlogs.length === 0 ? (
+              <tr>
+                <td colSpan="6" className="no-data">
+                  📭 No blogs found. Create your first blog post!
+                </td>
+              </tr>
+            ) : (
+              filteredBlogs.slice((page - 1) * 10, page * 10).map(blog => (
+                <tr key={blog._id} className={selectedBlogs.includes(blog._id) ? 'selected' : ''}>
+                  <td>
+                    <input
+                      type="checkbox"
+                      checked={selectedBlogs.includes(blog._id)}
+                      onChange={() => toggleBlogSelection(blog._id)}
+                      className="blog-checkbox"
+                      disabled={loading}
+                    />
+                  </td>
+                  <td>
+                    <div className="blog-title-cell">
+                      <h4>{blog.title || 'Untitled'}</h4>
+                      <p className="blog-excerpt">
+                        {blog.excerpt?.substring(0, 100) || 'No excerpt...'}
+                      </p>
+                    </div>
+                  </td>
+                  <td>
+                    <span className={`status-badge ${blog.isPublished ? 'published' : 'draft'}`}>
+                      {blog.isPublished ? 'published' : 'draft'}
+                    </span>
+                  </td>
+                  <td>
+                    <span className={`visibility-badge ${blog.isVisible ? 'visible' : 'hidden'}`}>
+                      {blog.isVisible ? '✅ Visible' : '🚫 Hidden'}
+                    </span>
+                  </td>
+                  <td>
+                    <span className="blog-date">
+                      {blog.formattedDate}
+                    </span>
+                  </td>
+                  <td>
+                    <div className="action-buttons">
+                      <button
+                        className="btn-action view"
+                        onClick={() => window.open(`/blog/${blog._id}`, '_blank')}
+                        title="View on website"
+                        disabled={loading}
+                      >
+                        👁️ View
+                      </button>
+                      <button
+                        className="btn-action edit"
+                        onClick={() => navigate(`/admin/blogs/edit/${blog._id}`)}
+                        title="Edit blog"
+                        disabled={loading}
+                      >
+                        ✏️ Edit
+                      </button>
+                      <button
+                        className="btn-action publish"
+                        onClick={() => handlePublish(blog._id)}
+                        title={blog.isPublished ? 'Unpublish' : 'Publish'}
+                        disabled={loading}
+                      >
+                        {blog.isPublished ? '📕 Unpublish' : '📗 Publish'}
+                      </button>
+                      <button
+                        className={`btn-action ${blog.isVisible ? 'hide' : 'show'}`}
+                        onClick={() => {
+                          setBlogToToggle(blog);
+                          setShowVisibilityModal(true);
+                        }}
+                        title={blog.isVisible ? 'Hide from website' : 'Show on website'}
+                        disabled={loading}
+                      >
+                        {blog.isVisible ? '🚫 Hide' : '✅ Show'}
+                      </button>
+                      <button
+                        className="btn-action delete"
+                        onClick={() => {
+                          setBlogToDelete(blog);
+                          setShowDeleteModal(true);
+                        }}
+                        title="Delete blog"
+                        disabled={loading}
+                      >
+                        🗑️ Delete
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              ))
+            )}
+          </tbody>
+        </table>
       </div>
 
-      {/* Blog List */}
-      <div style={styles.blogList}>
-        {paginatedBlogs.length === 0 ? (
-          <div style={styles.emptyState}>
-            <div style={styles.emptyIcon}>📝</div>
-            <h3>No Blog Posts Found</h3>
-            <p>Try adjusting your filters or create a new blog post</p>
-            <div style={styles.emptyActions}>
-              <button 
-                style={styles.resetButton}
-                onClick={handleResetFilters}
-              >
-                Reset All Filters
+      {/* Pagination */}
+      {filteredBlogs.length > 0 && (
+        <div className="pagination">
+          <button 
+            className="btn btn-secondary"
+            onClick={() => setPage(prev => Math.max(prev - 1, 1))}
+            disabled={page === 1 || loading}
+          >
+            ← Previous
+          </button>
+          <span className="page-info">
+            Page {page} of {Math.ceil(filteredBlogs.length / 10)}
+          </span>
+          <button 
+            className="btn btn-secondary"
+            onClick={() => setPage(prev => Math.min(prev + 1, Math.ceil(filteredBlogs.length / 10)))}
+            disabled={page === Math.ceil(filteredBlogs.length / 10) || loading}
+          >
+            Next →
+          </button>
+        </div>
+      )}
+
+      {/* Delete Confirmation Modal */}
+      {showDeleteModal && blogToDelete && (
+        <div className="modal-overlay">
+          <div className="modal">
+            <div className="modal-header">
+              <h3>🗑️ Delete Blog</h3>
+              <button className="modal-close" onClick={() => setShowDeleteModal(false)}>
+                ×
               </button>
-              <button 
-                style={styles.createButton}
-                onClick={handleCreate}
+            </div>
+            <div className="modal-body">
+              <p>Are you sure you want to delete this blog?</p>
+              <div className="blog-to-delete">
+                <strong>{blogToDelete.title}</strong>
+                <p>ID: {blogToDelete._id}</p>
+                <p>This action cannot be undone!</p>
+              </div>
+            </div>
+            <div className="modal-footer">
+              <button
+                className="btn btn-secondary"
+                onClick={() => setShowDeleteModal(false)}
+                disabled={loading}
               >
-                + Create New Post
+                Cancel
+              </button>
+              <button
+                className="btn btn-danger"
+                onClick={() => handleDelete(blogToDelete._id)}
+                disabled={loading}
+              >
+                {loading ? 'Deleting...' : 'Delete Permanently'}
               </button>
             </div>
           </div>
-        ) : (
-          <>
-            {paginatedBlogs.map(blog => (
-              <div key={blog.id} style={styles.blogCard}>
-                <div style={styles.blogContent}>
-                  <div style={styles.blogHeader}>
-                    <div style={styles.blogTitleSection}>
-                      <h3 style={styles.blogTitle}>{blog.title}</h3>
-                      <div style={styles.blogBadges}>
-                        {blog.featured && (
-                          <span style={styles.featuredBadge}>Featured</span>
-                        )}
-                        <span style={{
-                          ...styles.status,
-                          ...(blog.status === 'published' ? styles.statusPublished : styles.statusDraft)
-                        }}>
-                          {blog.status}
-                        </span>
-                      </div>
-                    </div>
-                    <div style={styles.blogActionsMenu}>
-                      <button
-                        style={styles.viewAction}
-                        onClick={() => handleView(blog.id)}
-                        title="View post"
-                      >
-                        👁
-                      </button>
-                    </div>
-                  </div>
-                  
-                  <p style={styles.blogExcerpt}>{blog.excerpt}</p>
-                  
-                  <div style={styles.blogMeta}>
-                    <div style={styles.blogTags}>
-                      <span style={styles.metaLabel}>Tags:</span>
-                      {blog.tags.map((tag, index) => (
-                        <span key={index} style={styles.tag}>{tag}</span>
-                      ))}
-                    </div>
-                    <div style={styles.blogInfo}>
-                      <span style={styles.blogAuthor}>By {blog.author}</span>
-                      <span style={styles.blogDate}>{formatDate(blog.createdAt)}</span>
-                      {blog.readTime && (
-                        <span style={styles.readTime}>⏱️ {blog.readTime}</span>
-                      )}
-                    </div>
-                  </div>
-                  
-                  <div style={styles.blogActions}>
-                    <div style={styles.blogStats}>
-                      <span style={styles.stat}>👁 {blog.views.toLocaleString()}</span>
-                      <span style={styles.stat}>💬 {blog.comments}</span>
-                      <span style={styles.stat}>❤️ {blog.likes}</span>
-                    </div>
-                    
-                    <div style={styles.actionButtons}>
-                      <button 
-                        style={styles.actionButton}
-                        onClick={() => handleEdit(blog.id)}
-                      >
-                        Edit
-                      </button>
-                      <button 
-                        style={{
-                          ...styles.actionButton,
-                          ...(blog.status === 'draft' ? styles.publishButton : styles.unpublishButton)
-                        }}
-                        onClick={() => handlePublish(blog.id)}
-                      >
-                        {blog.status === 'draft' ? 'Publish' : 'Unpublish'}
-                      </button>
-                      <button 
-                        style={{...styles.actionButton, ...styles.deleteButton}}
-                        onClick={() => handleDelete(blog.id)}
-                      >
-                        Delete
-                      </button>
-                    </div>
-                  </div>
-                </div>
+        </div>
+      )}
+
+      {/* Visibility Toggle Modal */}
+      {showVisibilityModal && blogToToggle && (
+        <div className="modal-overlay">
+          <div className="modal">
+            <div className="modal-header">
+              <h3>{blogToToggle.isVisible ? '🚫 Hide Blog' : '✅ Show Blog'}</h3>
+              <button className="modal-close" onClick={() => setShowVisibilityModal(false)}>
+                ×
+              </button>
+            </div>
+            <div className="modal-body">
+              <p>
+                {blogToToggle.isVisible
+                  ? 'This blog will be hidden from the public website.'
+                  : 'This blog will be visible on the public website.'}
+              </p>
+              <div className="blog-to-toggle">
+                <strong>{blogToToggle.title}</strong>
+                <p>Current: {blogToToggle.isVisible ? 'Visible' : 'Hidden'}</p>
               </div>
-            ))}
-            
-            {/* Pagination */}
-            {totalPages > 1 && (
-              <div style={styles.pagination}>
-                <button 
-                  style={styles.pageButton}
-                  onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
-                  disabled={currentPage === 1}
-                >
-                  ← Previous
-                </button>
-                
-                <div style={styles.pageNumbers}>
-                  {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
-                    let pageNum;
-                    if (totalPages <= 5) {
-                      pageNum = i + 1;
-                    } else if (currentPage <= 3) {
-                      pageNum = i + 1;
-                    } else if (currentPage >= totalPages - 2) {
-                      pageNum = totalPages - 4 + i;
-                    } else {
-                      pageNum = currentPage - 2 + i;
-                    }
-                    
-                    if (pageNum > totalPages || pageNum < 1) return null;
-                    
-                    return (
-                      <button
-                        key={pageNum}
-                        style={{
-                          ...styles.pageNumber,
-                          ...(currentPage === pageNum && styles.pageNumberActive)
-                        }}
-                        onClick={() => setCurrentPage(pageNum)}
-                      >
-                        {pageNum}
-                      </button>
-                    );
-                  })}
-                  
-                  {totalPages > 5 && currentPage < totalPages - 2 && (
-                    <>
-                      <span style={styles.pageEllipsis}>...</span>
-                      <button
-                        style={styles.pageNumber}
-                        onClick={() => setCurrentPage(totalPages)}
-                      >
-                        {totalPages}
-                      </button>
-                    </>
-                  )}
-                </div>
-                
-                <button 
-                  style={styles.pageButton}
-                  onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
-                  disabled={currentPage === totalPages}
-                >
-                  Next →
-                </button>
-              </div>
-            )}
-          </>
-        )}
-      </div>
+            </div>
+            <div className="modal-footer">
+              <button
+                className="btn btn-secondary"
+                onClick={() => setShowVisibilityModal(false)}
+                disabled={loading}
+              >
+                Cancel
+              </button>
+              <button
+                className={`btn ${blogToToggle.isVisible ? 'btn-warning' : 'btn-success'}`}
+                onClick={() => toggleVisibility(blogToToggle._id)}
+                disabled={loading}
+              >
+                {loading ? 'Updating...' : blogToToggle.isVisible ? 'Hide from Website' : 'Show on Website'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
-
-const styles = {
-  container: {
-    padding: '24px',
-    background: '#f8f9fa',
-    minHeight: '100vh',
-    maxWidth: '1400px',
-    margin: '0 auto'
-  },
-  loading: {
-    display: 'flex',
-    flexDirection: 'column',
-    alignItems: 'center',
-    justifyContent: 'center',
-    height: '400px',
-    color: '#666'
-  },
-  spinner: {
-    width: '50px',
-    height: '50px',
-    border: '4px solid rgba(0, 123, 255, 0.1)',
-    borderTop: '4px solid #007bff',
-    borderRadius: '50%',
-    animation: 'spin 1s linear infinite',
-    marginBottom: '20px'
-  },
-  errorContainer: {
-    textAlign: 'center',
-    padding: '60px 20px',
-    background: 'white',
-    borderRadius: '12px',
-    boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
-    maxWidth: '500px',
-    margin: '100px auto'
-  },
-  errorIcon: {
-    fontSize: '48px',
-    marginBottom: '20px'
-  },
-  retryButton: {
-    padding: '10px 24px',
-    background: '#007bff',
-    color: 'white',
-    border: 'none',
-    borderRadius: '6px',
-    cursor: 'pointer',
-    fontSize: '14px',
-    fontWeight: '500',
-    marginTop: '20px',
-    transition: 'background 0.3s ease'
-  },
-  header: {
-    display: 'flex',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    marginBottom: '32px',
-    flexWrap: 'wrap',
-    gap: '20px'
-  },
-  title: {
-    margin: '0',
-    color: '#1a1a1a',
-    fontSize: '32px',
-    fontWeight: '700',
-    background: 'linear-gradient(135deg, #007bff 0%, #0056b3 100%)',
-    WebkitBackgroundClip: 'text',
-    WebkitTextFillColor: 'transparent'
-  },
-  subtitle: {
-    margin: '8px 0 0 0',
-    color: '#666',
-    fontSize: '15px',
-    fontWeight: '400'
-  },
-  headerActions: {
-    display: 'flex',
-    gap: '12px',
-    flexWrap: 'wrap'
-  },
-  createButton: {
-    padding: '12px 24px',
-    background: 'linear-gradient(135deg, #007bff 0%, #0056b3 100%)',
-    color: 'white',
-    border: 'none',
-    borderRadius: '8px',
-    cursor: 'pointer',
-    fontSize: '14px',
-    fontWeight: '600',
-    transition: 'all 0.3s ease',
-    boxShadow: '0 2px 8px rgba(0, 123, 255, 0.3)',
-    '&:hover': {
-      transform: 'translateY(-2px)',
-      boxShadow: '0 4px 12px rgba(0, 123, 255, 0.4)'
-    }
-  },
-  viewButton: {
-    padding: '12px 20px',
-    background: 'white',
-    color: '#333',
-    border: '2px solid #e9ecef',
-    borderRadius: '8px',
-    cursor: 'pointer',
-    fontSize: '14px',
-    fontWeight: '500',
-    transition: 'all 0.3s ease',
-    '&:hover': {
-      background: '#f8f9fa',
-      borderColor: '#007bff'
-    }
-  },
-  stats: {
-    display: 'grid',
-    gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))',
-    gap: '16px',
-    marginBottom: '32px'
-  },
-  statCard: {
-    background: 'white',
-    padding: '24px',
-    borderRadius: '12px',
-    boxShadow: '0 2px 8px rgba(0,0,0,0.08)',
-    textAlign: 'center',
-    transition: 'transform 0.3s ease',
-    '&:hover': {
-      transform: 'translateY(-4px)'
-    }
-  },
-  statNumber: {
-    fontSize: '36px',
-    fontWeight: '700',
-    color: '#1a1a1a',
-    marginBottom: '8px'
-  },
-  statLabel: {
-    fontSize: '14px',
-    color: '#666',
-    fontWeight: '500'
-  },
-  statPublished: {
-    borderBottom: '4px solid #28a745'
-  },
-  statDraft: {
-    borderBottom: '4px solid #ffc107'
-  },
-  statFeatured: {
-    borderBottom: '4px solid #6f42c1'
-  },
-  filters: {
-    background: 'white',
-    padding: '24px',
-    borderRadius: '12px',
-    boxShadow: '0 2px 8px rgba(0,0,0,0.08)',
-    marginBottom: '20px'
-  },
-  searchContainer: {
-    position: 'relative',
-    marginBottom: '20px'
-  },
-  searchInput: {
-    width: '100%',
-    padding: '14px 20px',
-    paddingRight: '40px',
-    border: '2px solid #e9ecef',
-    borderRadius: '8px',
-    fontSize: '15px',
-    transition: 'border-color 0.3s ease',
-    '&:focus': {
-      outline: 'none',
-      borderColor: '#007bff',
-      boxShadow: '0 0 0 3px rgba(0, 123, 255, 0.1)'
-    }
-  },
-  clearSearch: {
-    position: 'absolute',
-    right: '12px',
-    top: '50%',
-    transform: 'translateY(-50%)',
-    background: 'transparent',
-    border: 'none',
-    fontSize: '20px',
-    color: '#666',
-    cursor: 'pointer',
-    padding: '0',
-    width: '24px',
-    height: '24px',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    '&:hover': {
-      color: '#dc3545'
-    }
-  },
-  filterControls: {
-    display: 'flex',
-    flexWrap: 'wrap',
-    gap: '24px',
-    alignItems: 'center'
-  },
-  filterGroup: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: '12px'
-  },
-  filterLabel: {
-    fontSize: '14px',
-    fontWeight: '600',
-    color: '#333',
-    whiteSpace: 'nowrap'
-  },
-  filterTabs: {
-    display: 'flex',
-    gap: '8px',
-    flexWrap: 'wrap'
-  },
-  filterTab: {
-    padding: '8px 16px',
-    border: '2px solid #e9ecef',
-    background: 'white',
-    borderRadius: '6px',
-    cursor: 'pointer',
-    fontSize: '14px',
-    fontWeight: '500',
-    transition: 'all 0.3s ease',
-    minWidth: '80px',
-    textAlign: 'center'
-  },
-  filterTabActive: {
-    background: '#007bff',
-    color: 'white',
-    borderColor: '#007bff'
-  },
-  sortButtons: {
-    display: 'flex',
-    gap: '8px',
-    flexWrap: 'wrap'
-  },
-  sortButton: {
-    padding: '8px 16px',
-    border: '2px solid #e9ecef',
-    background: 'white',
-    borderRadius: '6px',
-    cursor: 'pointer',
-    fontSize: '14px',
-    fontWeight: '500',
-    transition: 'all 0.3s ease',
-    minWidth: '100px',
-    display: 'flex',
-    justifyContent: 'center',
-    alignItems: 'center',
-    gap: '4px'
-  },
-  sortButtonActive: {
-    background: '#e7f3ff',
-    color: '#007bff',
-    borderColor: '#007bff'
-  },
-  resetButton: {
-    padding: '8px 16px',
-    border: '2px solid #e9ecef',
-    background: 'white',
-    borderRadius: '6px',
-    cursor: 'pointer',
-    fontSize: '14px',
-    fontWeight: '500',
-    color: '#666',
-    transition: 'all 0.3s ease',
-    marginLeft: 'auto',
-    '&:hover': {
-      background: '#f8f9fa',
-      borderColor: '#dc3545',
-      color: '#dc3545'
-    }
-  },
-  resultsInfo: {
-    display: 'flex',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    padding: '12px 0',
-    marginBottom: '16px',
-    color: '#666',
-    fontSize: '14px'
-  },
-  pageInfo: {
-    fontWeight: '600',
-    color: '#333'
-  },
-  blogList: {
-    display: 'flex',
-    flexDirection: 'column',
-    gap: '16px'
-  },
-  blogCard: {
-    background: 'white',
-    borderRadius: '12px',
-    boxShadow: '0 2px 8px rgba(0,0,0,0.08)',
-    overflow: 'hidden',
-    transition: 'all 0.3s ease',
-    borderLeft: '4px solid transparent',
-    '&:hover': {
-      transform: 'translateY(-2px)',
-      boxShadow: '0 8px 24px rgba(0,0,0,0.12)',
-      borderLeftColor: '#007bff'
-    }
-  },
-  blogContent: {
-    padding: '24px'
-  },
-  blogHeader: {
-    display: 'flex',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    marginBottom: '12px',
-    gap: '16px'
-  },
-  blogTitleSection: {
-    flex: '1',
-    minWidth: '0'
-  },
-  blogTitle: {
-    margin: '0 0 8px 0',
-    fontSize: '20px',
-    fontWeight: '600',
-    color: '#1a1a1a',
-    lineHeight: '1.4'
-  },
-  blogBadges: {
-    display: 'flex',
-    gap: '8px',
-    flexWrap: 'wrap'
-  },
-  featuredBadge: {
-    padding: '4px 10px',
-    background: 'linear-gradient(135deg, #6f42c1 0%, #4a1fa3 100%)',
-    color: 'white',
-    borderRadius: '12px',
-    fontSize: '12px',
-    fontWeight: '600'
-  },
-  status: {
-    padding: '4px 12px',
-    borderRadius: '12px',
-    fontSize: '12px',
-    fontWeight: '600',
-    textTransform: 'uppercase',
-    letterSpacing: '0.5px'
-  },
-  statusPublished: {
-    background: '#d4edda',
-    color: '#155724'
-  },
-  statusDraft: {
-    background: '#fff3cd',
-    color: '#856404'
-  },
-  blogActionsMenu: {
-    display: 'flex',
-    gap: '8px'
-  },
-  viewAction: {
-    padding: '8px',
-    background: 'transparent',
-    border: 'none',
-    borderRadius: '6px',
-    cursor: 'pointer',
-    fontSize: '16px',
-    transition: 'all 0.3s ease',
-    '&:hover': {
-      background: '#f8f9fa'
-    }
-  },
-  blogExcerpt: {
-    margin: '0 0 20px 0',
-    color: '#666',
-    fontSize: '15px',
-    lineHeight: '1.6'
-  },
-  blogMeta: {
-    display: 'flex',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: '20px',
-    flexWrap: 'wrap',
-    gap: '12px'
-  },
-  blogTags: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: '8px',
-    flexWrap: 'wrap'
-  },
-  metaLabel: {
-    fontSize: '13px',
-    color: '#666',
-    fontWeight: '500'
-  },
-  tag: {
-    background: '#e7f3ff',
-    color: '#007bff',
-    padding: '4px 10px',
-    borderRadius: '12px',
-    fontSize: '12px',
-    fontWeight: '500',
-    transition: 'all 0.3s ease',
-    '&:hover': {
-      background: '#cfe2ff'
-    }
-  },
-  blogInfo: {
-    display: 'flex',
-    gap: '16px',
-    fontSize: '13px',
-    color: '#666',
-    alignItems: 'center'
-  },
-  blogAuthor: {
-    fontWeight: '600',
-    color: '#333'
-  },
-  blogDate: {
-    color: '#666'
-  },
-  readTime: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: '4px'
-  },
-  blogActions: {
-    display: 'flex',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    flexWrap: 'wrap',
-    gap: '16px',
-    paddingTop: '16px',
-    borderTop: '1px solid #e9ecef'
-  },
-  blogStats: {
-    display: 'flex',
-    gap: '20px',
-    fontSize: '14px',
-    color: '#666'
-  },
-  stat: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: '6px'
-  },
-  actionButtons: {
-    display: 'flex',
-    gap: '8px',
-    flexWrap: 'wrap'
-  },
-  actionButton: {
-    padding: '8px 16px',
-    background: '#6c757d',
-    color: 'white',
-    border: 'none',
-    borderRadius: '6px',
-    cursor: 'pointer',
-    fontSize: '13px',
-    fontWeight: '500',
-    transition: 'all 0.3s ease',
-    minWidth: '80px'
-  },
-  publishButton: {
-    background: '#28a745',
-    '&:hover': {
-      background: '#218838'
-    }
-  },
-  unpublishButton: {
-    background: '#ffc107',
-    color: '#212529',
-    '&:hover': {
-      background: '#e0a800'
-    }
-  },
-  deleteButton: {
-    background: '#dc3545',
-    '&:hover': {
-      background: '#c82333'
-    }
-  },
-  emptyState: {
-    textAlign: 'center',
-    padding: '80px 20px',
-    background: 'white',
-    borderRadius: '12px',
-    boxShadow: '0 2px 8px rgba(0,0,0,0.08)'
-  },
-  emptyIcon: {
-    fontSize: '64px',
-    marginBottom: '24px',
-    opacity: '0.5'
-  },
-  emptyActions: {
-    display: 'flex',
-    justifyContent: 'center',
-    gap: '12px',
-    marginTop: '24px'
-  },
-  pagination: {
-    display: 'flex',
-    justifyContent: 'center',
-    alignItems: 'center',
-    gap: '16px',
-    marginTop: '32px',
-    paddingTop: '24px',
-    borderTop: '1px solid #e9ecef'
-  },
-  pageButton: {
-    padding: '10px 20px',
-    border: '2px solid #e9ecef',
-    background: 'white',
-    borderRadius: '8px',
-    cursor: 'pointer',
-    fontSize: '14px',
-    fontWeight: '500',
-    transition: 'all 0.3s ease',
-    minWidth: '100px',
-    '&:disabled': {
-      opacity: '0.5',
-      cursor: 'not-allowed'
-    },
-    '&:hover:not(:disabled)': {
-      background: '#f8f9fa',
-      borderColor: '#007bff'
-    }
-  },
-  pageNumbers: {
-    display: 'flex',
-    gap: '8px',
-    alignItems: 'center'
-  },
-  pageNumber: {
-    width: '40px',
-    height: '40px',
-    border: '2px solid #e9ecef',
-    background: 'white',
-    borderRadius: '8px',
-    cursor: 'pointer',
-    fontSize: '14px',
-    fontWeight: '500',
-    transition: 'all 0.3s ease',
-    '&:hover': {
-      background: '#f8f9fa',
-      borderColor: '#007bff'
-    }
-  },
-  pageNumberActive: {
-    background: '#007bff',
-    color: 'white',
-    borderColor: '#007bff'
-  },
-  pageEllipsis: {
-    padding: '0 8px',
-    color: '#666'
-  }
-};
-
-// Add CSS animations
-const styleElement = document.createElement('style');
-styleElement.textContent = `
-  @keyframes spin {
-    0% { transform: rotate(0deg); }
-    100% { transform: rotate(360deg); }
-  }
-  
-  @keyframes fadeIn {
-    from { opacity: 0; transform: translateY(10px); }
-    to { opacity: 1; transform: translateY(0); }
-  }
-  
-  ${Object.keys(styles).map(key => {
-    if (styles[key] && typeof styles[key] === 'object') {
-      return `.${key} { animation: fadeIn 0.3s ease-out; }`;
-    }
-    return '';
-  }).join('')}
-`;
-document.head.appendChild(styleElement);
 
 export default BlogList;

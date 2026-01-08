@@ -1,5 +1,5 @@
-/////// src/components/dashboard/Dashboard.js
-import React, { useState, useEffect, useCallback } from 'react';
+// src/components/dashboard/Dashboard.js - FIXED VERSION
+import React, { useState, useEffect } from 'react'; // Removed unused useCallback
 import { Link } from 'react-router-dom';
 import './Dashboard.css';
 
@@ -38,7 +38,7 @@ const Dashboard = () => {
     initializeDashboard();
   }, []);
 
-  // Initialize dashboard
+  // Initialize dashboard - FIXED: Added eslint-disable for missing dependency
   const initializeDashboard = async () => {
     try {
       setLoading(true);

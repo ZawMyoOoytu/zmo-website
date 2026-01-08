@@ -1,4 +1,4 @@
-import React, { createContext, useState, useContext, useEffect } from 'react';
+import React, { createContext, useState, useContext, useEffect, useCallback } from 'react';
 
 const AuthContext = createContext();
 
@@ -19,7 +19,7 @@ export function AuthProvider({ children }) {
   const [currentApiUrl, setCurrentApiUrl] = useState('');
 
   // Determine which API URL to use
-  const getApiUrl = () => {
+  const getApiUrl = useCallback(() => {
     // Check environment variable first
     const envUrl = process.env.REACT_APP_API_URL;
     
@@ -39,7 +39,7 @@ export function AuthProvider({ children }) {
     const prodUrl = 'https://zmo-backend.onrender.com/api';
     console.log('🌐 Using production API URL:', prodUrl);
     return prodUrl;
-  };
+  }, []);
 
   const API_BASE_URL = getApiUrl();
   
@@ -49,7 +49,7 @@ export function AuthProvider({ children }) {
   }, [API_BASE_URL]);
 
   // Custom fetch with better error handling
-  const apiFetch = async (endpoint, options = {}) => {
+  const apiFetch = useCallback(async (endpoint, options = {}) => {
     const url = `${API_BASE_URL}${endpoint}`;
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 10000);
@@ -101,10 +101,10 @@ export function AuthProvider({ children }) {
       
       throw error;
     }
-  };
+  }, [API_BASE_URL]);
 
-  // Test backend connection
-  const testBackendConnection = async () => {
+  // Test backend connection - WRAPPED IN useCallback
+  const testBackendConnection = useCallback(async () => {
     try {
       console.log('🔌 Testing connection to:', API_BASE_URL);
       const data = await apiFetch('/health');
@@ -122,7 +122,7 @@ export function AuthProvider({ children }) {
       setBackendStatus('disconnected');
       return { success: false, error: error.message };
     }
-  };
+  }, [API_BASE_URL, apiFetch]);
 
   // Check for existing session on mount
   useEffect(() => {
@@ -157,10 +157,10 @@ export function AuthProvider({ children }) {
     };
     
     initializeAuth();
-  }, [API_BASE_URL]);
+  }, [API_BASE_URL, testBackendConnection]);
 
   // Login function
-  const login = async (email, password) => {
+  const login = useCallback(async (email, password) => {
     setAuthLoading(true);
     
     try {
@@ -247,10 +247,10 @@ export function AuthProvider({ children }) {
     } finally {
       setAuthLoading(false);
     }
-  };
+  }, [backendStatus, apiFetch, backendInfo]);
 
   // Logout function
-  const logout = () => {
+  const logout = useCallback(() => {
     console.log('👋 Logging out...');
     
     localStorage.removeItem('adminToken');
@@ -261,13 +261,13 @@ export function AuthProvider({ children }) {
     setBackendInfo(null);
     
     console.log('✅ Logout successful');
-  };
+  }, []);
 
   // Check connection
   const checkConnection = testBackendConnection;
 
   // Clear auth data
-  const clearAuthData = () => {
+  const clearAuthData = useCallback(() => {
     console.log('🧹 Clearing auth data...');
     
     localStorage.removeItem('adminToken');
@@ -278,16 +278,16 @@ export function AuthProvider({ children }) {
     setBackendInfo(null);
     
     window.location.reload();
-  };
+  }, []);
 
   // Get auth headers
-  const getAuthHeaders = () => {
+  const getAuthHeaders = useCallback(() => {
     const token = localStorage.getItem('adminToken');
     return {
       'Content-Type': 'application/json',
       'Authorization': token ? `Bearer ${token}` : '',
     };
-  };
+  }, []);
 
   const value = {
     // State
@@ -304,13 +304,13 @@ export function AuthProvider({ children }) {
     checkConnection,
     clearAuthData,
     getAuthHeaders,
-    apiFetch: (endpoint, options) => apiFetch(endpoint, {
+    apiFetch: useCallback((endpoint, options) => apiFetch(endpoint, {
       ...options,
       headers: {
         ...getAuthHeaders(),
         ...options?.headers,
       },
-    }),
+    }), [apiFetch, getAuthHeaders]),
     
     // Computed
     isAuthenticated: !!user,

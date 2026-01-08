@@ -1,20 +1,64 @@
 {
-  "rewrites": [
+  "version": 2,
+  "builds": [
     {
-      "source": "/api/:path*",
-      "destination": "https://zmo-backend.onrender.com/api/:path*"
+      "src": "admin-panel/package.json",
+      "use": "@vercel/static-build",
+      "config": {
+        "distDir": "dist"
+      }
+    }
+  ],
+  "routes": [
+    {
+      "src": "/api/(.*)",
+      "dest": "https://zmo-backend.onrender.com/api/$1",
+      "methods": ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
+      "headers": {
+        "Access-Control-Allow-Origin": "*",
+        "Access-Control-Allow-Methods": "GET,POST,PUT,DELETE,PATCH,OPTIONS",
+        "Access-Control-Allow-Headers": "X-Requested-With, Content-Type, Authorization, Accept"
+      }
     },
     {
-      "source": "/auth/:path*",
-      "destination": "https://zmo-backend.onrender.com/auth/:path*"
+      "src": "/auth/(.*)",
+      "dest": "https://zmo-backend.onrender.com/auth/$1",
+      "methods": ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
+      "headers": {
+        "Access-Control-Allow-Origin": "*",
+        "Access-Control-Allow-Methods": "GET,POST,PUT,DELETE,PATCH,OPTIONS",
+        "Access-Control-Allow-Headers": "X-Requested-With, Content-Type, Authorization, Accept"
+      }
     },
     {
-      "source": "/admin/:path*",
-      "destination": "https://zmo-backend.onrender.com/admin/:path*"
+      "src": "/admin-api/(.*)",
+      "dest": "https://zmo-backend.onrender.com/admin/$1",
+      "methods": ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
+      "headers": {
+        "Access-Control-Allow-Origin": "*",
+        "Access-Control-Allow-Methods": "GET,POST,PUT,DELETE,PATCH,OPTIONS",
+        "Access-Control-Allow-Headers": "X-Requested-With, Content-Type, Authorization, Accept"
+      }
     },
     {
-      "source": "/(.*)",
-      "destination": "/index.html"
+      "src": "/uploads/(.*)",
+      "dest": "https://zmo-backend.onrender.com/uploads/$1"
+    },
+    {
+      "src": "/assets/(.*)",
+      "dest": "/assets/$1"
+    },
+    {
+      "src": "/(.*\\.(ico|png|jpg|jpeg|svg|gif|css|js|woff|woff2|ttf|eot|mp4|webm))",
+      "dest": "/$1"
+    },
+    {
+      "src": "/(.*)",
+      "dest": "/index.html",
+      "headers": {
+        "Cache-Control": "public, max-age=0, must-revalidate",
+        "Content-Security-Policy": "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self' data:; connect-src 'self' https://zmo-backend.onrender.com"
+      }
     }
   ],
   "headers": [
@@ -22,23 +66,41 @@
       "source": "/(.*)",
       "headers": [
         {
-          "key": "Access-Control-Allow-Origin",
-          "value": "*"
+          "key": "X-Frame-Options",
+          "value": "DENY"
         },
         {
-          "key": "Access-Control-Allow-Methods",
-          "value": "GET,POST,PUT,DELETE,OPTIONS"
+          "key": "X-Content-Type-Options",
+          "value": "nosniff"
         },
         {
-          "key": "Access-Control-Allow-Headers",
-          "value": "X-Requested-With, Content-Type, Authorization"
+          "key": "Referrer-Policy",
+          "value": "strict-origin-when-cross-origin"
+        },
+        {
+          "key": "Permissions-Policy",
+          "value": "camera=(), microphone=(), geolocation=()"
+        }
+      ]
+    },
+    {
+      "source": "/assets/(.*)",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=31536000, immutable"
         }
       ]
     }
   ],
-  "buildCommand": "npm run build",
-  "outputDirectory": "build",
-  "installCommand": "npm install",
-  "devCommand": "npm run start",
-  "framework": "create-react-app"
+  "env": {
+    "VITE_API_URL": "https://zmo-backend.onrender.com/api",
+    "VITE_API_BASE_URL": "https://zmo-backend.onrender.com",
+    "VITE_APP_ENV": "production",
+    "VITE_ADMIN_URL": "https://zmo-admin.vercel.app"
+  },
+  "buildCommand": "cd admin-panel && npm run build",
+  "installCommand": "cd admin-panel && npm install",
+  "outputDirectory": "admin-panel/dist",
+  "framework": "vite"
 }
