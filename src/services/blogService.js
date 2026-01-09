@@ -1,4 +1,4 @@
-// src/services/blogService.js - COMPLETE FIXED VERSION
+// src/services/blogService.js - COMPLETE FIXED VERSION WITH ENHANCED DELETE
 const API_BASE_URL = 'https://zmo-backend.onrender.com/api';
 
 // Get headers with optional token
@@ -147,19 +147,96 @@ export const blogService = {
     }
   },
 
-  // Delete blog
+  // Delete blog - ENHANCED VERSION WITH BETTER ERROR HANDLING
   deleteBlog: async (id) => {
     try {
+      console.log(`🗑️ Attempting to delete blog ${id}`);
+      
+      // Check authentication
+      const token = localStorage.getItem('adminToken') || sessionStorage.getItem('adminToken');
+      if (!token) {
+        throw new Error('Authentication required. Please login again.');
+      }
+      
+      // Log what we're sending
+      console.log(`🌐 DELETE request to: ${API_BASE_URL}/blogs/${id}`);
+      console.log(`🔐 Token present: ${!!token}`);
+      
       const response = await fetch(`${API_BASE_URL}/blogs/${id}`, {
         method: 'DELETE',
-        headers: getAuthHeaders()
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        }
       });
-      const data = await response.json();
-      if (!response.ok) throw new Error(data.error || 'Failed to delete blog');
-      return data;
+      
+      console.log(`📊 Delete response status: ${response.status}`);
+      
+      // Try to parse response as JSON
+      let data;
+      try {
+        data = await response.json();
+        console.log(`📦 Delete response data:`, data);
+      } catch (jsonError) {
+        console.error('❌ Error parsing delete response as JSON:', jsonError);
+        // If it's not JSON, try to get text
+        const text = await response.text();
+        data = { message: text || 'Unknown error' };
+      }
+      
+      // Handle different response structures
+      if (!response.ok) {
+        let errorMessage = `Delete failed with status ${response.status}`;
+        
+        // Try to extract meaningful error message
+        if (data.error) {
+          errorMessage = data.error;
+        } else if (data.message) {
+          errorMessage = data.message;
+        } else if (typeof data === 'string') {
+          errorMessage = data;
+        }
+        
+        // Handle specific status codes
+        if (response.status === 401) {
+          errorMessage = 'Unauthorized: Your session may have expired. Please login again.';
+          // Clear invalid token
+          localStorage.removeItem('adminToken');
+          sessionStorage.removeItem('adminToken');
+        } else if (response.status === 403) {
+          errorMessage = 'Forbidden: You do not have permission to delete this blog.';
+        } else if (response.status === 404) {
+          errorMessage = 'Blog not found. It may have already been deleted.';
+        } else if (response.status === 500) {
+          errorMessage = 'Server error. Please try again later.';
+        }
+        
+        throw new Error(errorMessage);
+      }
+      
+      // Success response
+      console.log(`✅ Blog ${id} deleted successfully`);
+      
+      // Return consistent success structure
+      return {
+        success: true,
+        message: data.message || 'Blog deleted successfully',
+        data: data.data || data,
+        blogId: id
+      };
+      
     } catch (error) {
       console.error(`❌ Error deleting blog ${id}:`, error);
-      throw error;
+      
+      // Enhance error message for network issues
+      let errorMessage = error.message;
+      if (error.message.includes('Failed to fetch')) {
+        errorMessage = 'Cannot connect to server. Please check your internet connection and ensure backend is running.';
+      } else if (error.message.includes('NetworkError')) {
+        errorMessage = 'Network error. Please check your internet connection.';
+      }
+      
+      throw new Error(errorMessage);
     }
   },
 
@@ -323,6 +400,70 @@ export const blogService = {
       return {
         success: false,
         message: `Cannot connect to public test endpoint: ${error.message}`
+      };
+    }
+  },
+
+  // New: Test if delete endpoint is accessible (for debugging)
+  testDeleteEndpoint: async (id = 'test') => {
+    try {
+      console.log(`🔍 Testing delete endpoint for blog ID: ${id}`);
+      
+      const token = localStorage.getItem('adminToken') || sessionStorage.getItem('adminToken');
+      
+      if (!token) {
+        return {
+          success: false,
+          message: 'No authentication token found. Please login first.',
+          endpoint: `${API_BASE_URL}/blogs/${id}`
+        };
+      }
+      
+      const response = await fetch(`${API_BASE_URL}/blogs/${id}`, {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      
+      console.log(`📊 Delete test response status: ${response.status}`);
+      
+      if (response.status === 404) {
+        // 404 is okay for testing - it means the endpoint exists but blog doesn't
+        return {
+          success: true,
+          message: 'Delete endpoint is accessible (404 means blog not found, but endpoint works)',
+          status: response.status,
+          endpoint: `${API_BASE_URL}/blogs/${id}`
+        };
+      }
+      
+      if (response.ok) {
+        const data = await response.json();
+        return {
+          success: true,
+          message: 'Delete endpoint is working',
+          details: data,
+          endpoint: `${API_BASE_URL}/blogs/${id}`
+        };
+      }
+      
+      const errorText = await response.text();
+      return {
+        success: false,
+        message: `Delete endpoint returned ${response.status}: ${errorText.substring(0, 100)}`,
+        status: response.status,
+        endpoint: `${API_BASE_URL}/blogs/${id}`
+      };
+      
+    } catch (error) {
+      console.error('❌ Delete endpoint test failed:', error);
+      return {
+        success: false,
+        message: `Cannot connect to delete endpoint: ${error.message}`,
+        error: error.message,
+        endpoint: `${API_BASE_URL}/blogs/${id}`
       };
     }
   }

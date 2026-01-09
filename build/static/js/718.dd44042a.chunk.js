@@ -1,2 +1,0 @@
-"use strict";(self.webpackChunkzmo_admin_panel=self.webpackChunkzmo_admin_panel||[]).push([[718],{718:(e,n,s)=>{s.r(n),s.d(n,{default:()=>r});s(43);var a=s(579);const r=()=>(0,a.jsxs)("div",{children:[(0,a.jsx)("h1",{children:"Project Management"}),(0,a.jsx)("p",{children:"This is where you manage your projects."})]})}}]);
-//# sourceMappingURL=718.dd44042a.chunk.js.map

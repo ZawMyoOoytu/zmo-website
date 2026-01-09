@@ -1,4 +1,4 @@
-// src/components/dashboard/BlogEditor.js - COMPLETE FIXED VERSION WITH IMAGE UPLOAD
+// src/components/dashboard/BlogEditor.js - COMPLETE FIXED VERSION WITH DELETE BUTTON
 import React, { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { blogService } from '../../services/blogService';
@@ -14,6 +14,7 @@ const BlogEditor = () => {
   const [isDragging, setIsDragging] = useState(false);
   const [showMessage, setShowMessage] = useState(false);
   const [debugInfo, setDebugInfo] = useState('');
+  const [imageLoadError, setImageLoadError] = useState(false);
 
   // Form state
   const [formData, setFormData] = useState({
@@ -58,7 +59,6 @@ const BlogEditor = () => {
   const extractBlogContent = (blogData) => {
     console.log('🔍 Extracting content from:', blogData);
     
-    // Check all possible content field names
     const contentFields = [
       'content',
       'body',
@@ -81,13 +81,11 @@ const BlogEditor = () => {
       }
     }
     
-    // Check nested structures
     if (blogData.data && blogData.data.content) {
       console.log('✅ Found content in data.content');
       return blogData.data.content;
     }
     
-    // If blogData itself is a string (rare but possible)
     if (typeof blogData === 'string') {
       return blogData;
     }
@@ -108,13 +106,12 @@ const BlogEditor = () => {
       return blogData.data.excerpt;
     }
     if (content && content.length > 0) {
-      // Create excerpt from content (first 150 chars)
       return content.substring(0, 150) + (content.length > 150 ? '...' : '');
     }
     return '';
   };
 
-  // Load blog data if editing - FIXED VERSION
+  // Load blog data if editing
   const loadBlogData = useCallback(async () => {
     if (!id) {
       console.log('🆕 Creating new blog - no ID provided');
@@ -127,7 +124,6 @@ const BlogEditor = () => {
       setDebugInfo(`Loading blog ${id}...`);
       console.log(`🚀 Loading blog data for ID: "${id}"`);
       
-      // FIRST: Check localStorage for cached data from BlogList
       const cachedBlog = localStorage.getItem(`blog_cache_${id}`);
       if (cachedBlog) {
         try {
@@ -152,7 +148,6 @@ const BlogEditor = () => {
             setDebugInfo(`✅ Loaded from cache: ${parsedBlog.title}`);
             showMessageWithTimeout('✅ Blog data loaded from cache', 'success');
             
-            // Clear this cache after use
             localStorage.removeItem(`blog_cache_${id}`);
             return;
           }
@@ -161,7 +156,6 @@ const BlogEditor = () => {
         }
       }
 
-      // SECOND: Try API call
       console.log('🌐 Making API call to fetch blog...');
       setDebugInfo('Fetching from API...');
       
@@ -172,18 +166,15 @@ const BlogEditor = () => {
         throw new Error('No data returned from API');
       }
       
-      // Log all available fields for debugging
       console.log('🔍 Available fields in response:', Object.keys(blogData));
       console.log('📊 Response type:', typeof blogData);
       
-      // Extract content using our utility function
       const content = extractBlogContent(blogData);
       const excerpt = extractExcerpt(blogData, content);
       
       console.log(`📝 Extracted content length: ${content.length} characters`);
       console.log(`📝 Extracted excerpt: ${excerpt.substring(0, 50)}...`);
       
-      // Prepare form data
       const formDataToSet = {
         title: blogData.title || blogData.data?.title || 'Untitled Blog',
         content: content,
@@ -207,7 +198,6 @@ const BlogEditor = () => {
       
       let errorMessage = error.message;
       
-      // Try fallback: fetch all blogs and find by ID
       if (error.message.includes('500') || error.message.includes('Failed')) {
         console.log('🔄 Trying fallback: fetching all blogs...');
         setDebugInfo('Trying fallback method...');
@@ -242,7 +232,6 @@ const BlogEditor = () => {
         }
       }
       
-      // Final error handling
       if (errorMessage.includes('404')) {
         errorMessage = 'Blog not found. It may have been deleted.';
         setTimeout(() => navigate('/admin/blogs'), 3000);
@@ -328,6 +317,54 @@ const BlogEditor = () => {
     }
   };
 
+  // DELETE BLOG POST FUNCTION
+  const handleDelete = async () => {
+    if (!id) {
+      showMessageWithTimeout('No blog post to delete', 'error');
+      return;
+    }
+
+    const confirmed = window.confirm(
+      '⚠️ Are you sure you want to delete this blog post?\n\nThis action cannot be undone!'
+    );
+    
+    if (!confirmed) return;
+
+    try {
+      setLoading(true);
+      setDebugInfo('Deleting blog post...');
+      
+      const token = localStorage.getItem('adminToken') || sessionStorage.getItem('adminToken');
+      if (!token) throw new Error('Authentication required');
+      
+      const response = await blogService.deleteBlog(id);
+      
+      if (response.success) {
+        showMessageWithTimeout('✅ Blog post deleted successfully!', 'success');
+        setDebugInfo('✅ Blog deleted');
+        
+        setTimeout(() => navigate('/admin/blogs'), 1500);
+      } else {
+        throw new Error(response.message || 'Failed to delete blog');
+      }
+    } catch (error) {
+      console.error('❌ Error deleting blog:', error);
+      setDebugInfo(`❌ Delete failed: ${error.message}`);
+      
+      let errorMessage = error.message;
+      if (error.message.includes('401')) {
+        errorMessage = 'Session expired. Please login again.';
+        setTimeout(() => navigate('/admin/login'), 2000);
+      } else if (error.message.includes('Failed to fetch')) {
+        errorMessage = 'Cannot connect to server. Please check your connection.';
+      }
+      
+      showMessageWithTimeout(`❌ ${errorMessage}`, 'error');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   // Drag & Drop
   const handleDragOver = (e) => { 
     e.preventDefault(); 
@@ -347,15 +384,13 @@ const BlogEditor = () => {
     }
   };
 
-  // Image upload to backend - UPDATED VERSION
+  // Image upload to backend
   const handleImageUpload = async (file) => {
-    // Validate file type
     if (!file.type.startsWith('image/')) {
       showMessageWithTimeout('❌ Please select an image file (JPG, PNG, GIF, WEBP)', 'error');
       return;
     }
     
-    // Check file size (5MB limit based on your backend)
     if (file.size > 5 * 1024 * 1024) {
       showMessageWithTimeout('❌ Image size must be less than 5MB', 'error');
       return;
@@ -373,13 +408,11 @@ const BlogEditor = () => {
         lastModified: new Date(file.lastModified).toLocaleString()
       });
       
-      // Check if user is authenticated
       const token = localStorage.getItem('adminToken') || sessionStorage.getItem('adminToken');
       if (!token) {
         throw new Error('You are not logged in. Please login and try again.');
       }
       
-      // Upload to backend using blogService
       const uploadResult = await blogService.uploadImage(file);
       
       if (uploadResult.success && uploadResult.imageUrl) {
@@ -398,10 +431,8 @@ const BlogEditor = () => {
       
       let errorMessage = error.message;
       
-      // Handle specific errors
       if (error.message.includes('Authentication required') || error.message.includes('not logged in')) {
         errorMessage = 'Session expired. Please login again.';
-        // Redirect to login
         setTimeout(() => navigate('/admin/login'), 2000);
       } else if (error.message.includes('Cannot connect')) {
         errorMessage = 'Cannot connect to server. Please check your internet connection.';
@@ -411,7 +442,6 @@ const BlogEditor = () => {
         errorMessage = 'Only image files (JPEG, PNG, GIF, WEBP) are allowed.';
       }
       
-      // Try fallback: Create local data URL
       try {
         console.log('🔄 Trying local fallback...');
         const reader = new FileReader();
@@ -429,7 +459,6 @@ const BlogEditor = () => {
       } catch (fallbackError) {
         console.error('❌ Local fallback also failed:', fallbackError);
         
-        // Last resort: Use placeholder
         const safeFileName = encodeURIComponent(file.name.substring(0, 20));
         const placeholderUrl = `https://via.placeholder.com/600x400/667eea/ffffff?text=${safeFileName}`;
         setFormData(prev => ({ ...prev, imageUrl: placeholderUrl }));
@@ -452,6 +481,7 @@ const BlogEditor = () => {
 
   const handleRemoveImage = () => {
     setFormData(prev => ({ ...prev, imageUrl: '' }));
+    setImageLoadError(false);
     showMessageWithTimeout('✅ Image removed', 'success');
   };
 
@@ -503,7 +533,6 @@ const BlogEditor = () => {
       const data = await response.json();
       console.log('📦 Direct API response:', data);
       
-      // Show in alert for quick viewing
       alert(`API Status: ${response.status}\n\nResponse:\n${JSON.stringify(data, null, 2)}`);
       
       setDebugInfo(`API Status: ${response.status}`);
@@ -522,6 +551,12 @@ const BlogEditor = () => {
       content: prev.content || `# ${prev.title || 'Sample Blog'}\n\n## Introduction\n\nThis is sample content because no content was found in the database.\n\n## Main Content\n\nYou can edit this content freely.\n\n- Point 1\n- Point 2\n- Point 3\n\n## Conclusion\n\nEdit and save your changes.`
     }));
     showMessageWithTimeout('✅ Sample content added', 'success');
+  };
+
+  // Handle image load error
+  const handleImageError = () => {
+    console.error('❌ Image failed to load:', formData.imageUrl);
+    setImageLoadError(true);
   };
 
   if (loading && id) {
@@ -714,11 +749,10 @@ const BlogEditor = () => {
             </div>
           </div>
 
-          {/* Featured Image Section - UPDATED */}
+          {/* Featured Image Section */}
           <div className="form-section">
             <h3>Featured Image</h3>
             
-            {/* Upload Instructions */}
             <div style={{
               marginBottom: '15px',
               padding: '12px',
@@ -739,7 +773,6 @@ const BlogEditor = () => {
               </ul>
             </div>
             
-            {/* Upload Status */}
             {uploading && (
               <div style={{
                 padding: '15px',
@@ -761,7 +794,6 @@ const BlogEditor = () => {
               </div>
             )}
             
-            {/* Upload Area */}
             <div className={`image-upload-area ${isDragging ? 'dragging' : ''}`} 
                  onDragOver={handleDragOver} 
                  onDragLeave={handleDragLeave} 
@@ -803,45 +835,40 @@ const BlogEditor = () => {
               ) : (
                 <div className="image-preview-container">
                   <div style={{ position: 'relative', marginBottom: '15px' }}>
-                    <img 
-                      src={formData.imageUrl} 
-                      alt="Preview" 
-                      className="image-preview"
-                      style={{ 
-                        maxWidth: '100%', 
-                        maxHeight: '300px', 
+                    {!imageLoadError ? (
+                      <img 
+                        src={formData.imageUrl} 
+                        alt="Preview" 
+                        className="image-preview"
+                        style={{ 
+                          maxWidth: '100%', 
+                          maxHeight: '300px', 
+                          borderRadius: '8px',
+                          border: '1px solid #dee2e6'
+                        }}
+                        onError={handleImageError}
+                      />
+                    ) : (
+                      <div style={{
+                        width: '100%',
+                        height: '200px',
+                        background: '#f8f9fa',
                         borderRadius: '8px',
-                        border: '1px solid #dee2e6'
-                      }}
-                      onError={(e) => {
-                        console.error('❌ Image failed to load:', formData.imageUrl);
-                        e.target.style.display = 'none';
-                        e.target.nextElementSibling.style.display = 'block';
-                      }}
-                    />
+                        border: '2px dashed #dee2e6',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        padding: '20px'
+                      }}>
+                        <div style={{ fontSize: '40px', marginBottom: '10px' }}>⚠️</div>
+                        <p style={{ color: '#666', marginBottom: '5px' }}>Image failed to load</p>
+                        <p style={{ color: '#999', fontSize: '12px', textAlign: 'center' }}>
+                          URL: {formData.imageUrl.substring(0, 50)}...
+                        </p>
+                      </div>
+                    )}
                     
-                    {/* Fallback if image fails to load */}
-                    <div style={{
-                      display: 'none',
-                      width: '100%',
-                      height: '200px',
-                      background: '#f8f9fa',
-                      borderRadius: '8px',
-                      border: '2px dashed #dee2e6',
-                      display: 'flex',
-                      flexDirection: 'column',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      padding: '20px'
-                    }}>
-                      <div style={{ fontSize: '40px', marginBottom: '10px' }}>⚠️</div>
-                      <p style={{ color: '#666', marginBottom: '5px' }}>Image failed to load</p>
-                      <p style={{ color: '#999', fontSize: '12px', textAlign: 'center' }}>
-                        URL: {formData.imageUrl.substring(0, 50)}...
-                      </p>
-                    </div>
-                    
-                    {/* Source indicator */}
                     {formData.imageUrl.startsWith('data:image/') && (
                       <div style={{
                         position: 'absolute',
@@ -860,7 +887,6 @@ const BlogEditor = () => {
                     )}
                   </div>
                   
-                  {/* Action Buttons */}
                   <div style={{ 
                     display: 'flex', 
                     gap: '10px', 
@@ -926,7 +952,6 @@ const BlogEditor = () => {
                     </button>
                   </div>
                   
-                  {/* Image Info */}
                   <div style={{
                     padding: '12px',
                     background: '#f8f9fa',
@@ -968,7 +993,6 @@ const BlogEditor = () => {
               )}
             </div>
             
-            {/* Manual URL Input */}
             <div className="image-url-input mt-4">
               <label style={{ display: 'block', marginBottom: '8px', fontWeight: '500' }}>
                 Or enter image URL manually:
@@ -995,7 +1019,7 @@ const BlogEditor = () => {
             </div>
           </div>
 
-          {/* Content - IMPORTANT SECTION */}
+          {/* Content */}
           <div className="form-section">
             <h3>
               Content <span className="required">*</span>
@@ -1083,7 +1107,7 @@ const BlogEditor = () => {
             </div>
           </div>
 
-          {/* Actions */}
+          {/* Actions with Delete Button */}
           <div className="form-actions">
             <button 
               type="button" 
@@ -1093,10 +1117,29 @@ const BlogEditor = () => {
             >
               Cancel
             </button>
+            
+            {/* Show Delete button only when editing an existing post */}
+            {id && (
+              <button 
+                type="button" 
+                className="btn btn-danger" 
+                onClick={handleDelete}
+                disabled={loading}
+                style={{
+                  background: '#dc3545',
+                  borderColor: '#dc3545',
+                  marginLeft: '10px'
+                }}
+              >
+                {loading ? 'Deleting...' : 'Delete Post'}
+              </button>
+            )}
+            
             <button 
               type="submit" 
               className="btn btn-primary" 
               disabled={loading}
+              style={{ marginLeft: 'auto' }}
             >
               {loading ? 'Saving...' : id ? 'Update Blog' : 'Create Blog'}
             </button>

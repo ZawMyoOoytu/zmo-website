@@ -1,5 +1,5 @@
-/////// src/components/dashboard/Dashboard.js
-import React, { useState, useEffect, useCallback } from 'react';
+// src/components/dashboard/Dashboard.js - CLEANED VERSION (No AU Admin User)
+import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import './Dashboard.css';
 
@@ -657,7 +657,7 @@ const Dashboard = () => {
         </div>
       )}
 
-      {/* Header */}
+      {/* CLEANED HEADER - No AU Admin User */}
       <div className="dashboard-header">
         <div className="header-top">
           <h1>Dashboard Overview</h1>
@@ -669,10 +669,6 @@ const Dashboard = () => {
               {stats.frontendStatus === 'online' ? '🌐 Frontend Online' : '⚠️ Frontend Issue'}
             </span>
           </div>
-        </div>
-        <div className="user-info">
-          <span className="user-avatar">AU</span>
-          <span>Admin User</span>
           <button 
             onClick={refreshAllData}
             className="refresh-header-btn"
