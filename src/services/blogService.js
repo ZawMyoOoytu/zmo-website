@@ -1,5 +1,64 @@
-// src/services/blogService.js - COMPLETE FIXED VERSION WITH ENHANCED DELETE
+// src/services/blogService.js - COMPLETE FIXED VERSION WITH AUTO-DRAFT PROTECTION
 const API_BASE_URL = 'https://zmo-backend.onrender.com/api';
+
+// ============================================
+// 🛡️ AUTO-DRAFT PROTECTION SYSTEM
+// ============================================
+
+// Track recently created blogs to protect them
+const protectedBlogs = new Set();
+
+// Protect a blog from auto-draft
+const protectBlog = (blogId, duration = 60000) => {
+  protectedBlogs.add(blogId);
+  console.log(`🛡️ Blog ${blogId} protected from auto-draft for ${duration/1000}s`);
+  
+  // Auto-remove protection
+  setTimeout(() => {
+    protectedBlogs.delete(blogId);
+    console.log(`🛡️ Protection expired for ${blogId}`);
+  }, duration);
+};
+
+// Check if update should be blocked
+const shouldBlockUpdate = (blogId, updateData) => {
+  if (!protectedBlogs.has(blogId)) return false;
+  
+  // Check if this is an auto-draft update
+  const isAutoDraftUpdate = 
+    (updateData.isVisible !== undefined && !updateData.published && !updateData.status) ||
+    updateData.published === false ||
+    updateData.status === 'draft';
+  
+  return isAutoDraftUpdate;
+};
+
+// Fix problematic update data
+const fixUpdateData = (blogId, updateData) => {
+  console.warn(`⚠️ Fixing auto-draft update for protected blog ${blogId}`);
+  
+  // Map isVisible to published/status
+  if (updateData.isVisible !== undefined) {
+    return {
+      ...updateData,
+      published: updateData.isVisible,
+      status: updateData.isVisible ? 'published' : 'draft',
+      _autoFixed: true
+    };
+  }
+  
+  // If no isVisible, default to published
+  return {
+    ...updateData,
+    published: true,
+    status: 'published',
+    _autoFixed: true
+  };
+};
+
+// ============================================
+// 🔧 UTILITY FUNCTIONS
+// ============================================
 
 // Get headers with optional token
 const getAuthHeaders = () => {
@@ -10,7 +69,19 @@ const getAuthHeaders = () => {
   };
 };
 
+// ============================================
+// 📦 BLOG SERVICE
+// ============================================
+
 export const blogService = {
+  // 🛡️ Protection methods
+  protectBlog,
+  isProtected: (blogId) => protectedBlogs.has(blogId),
+  clearProtection: () => {
+    protectedBlogs.clear();
+    console.log('🛡️ All protection cleared');
+  },
+
   // Test backend connection
   testConnection: async () => {
     try {
@@ -37,19 +108,73 @@ export const blogService = {
     }
   },
 
-  // Create new blog
+  // Create new blog - WITH PROTECTION
   createBlog: async (blogData) => {
     try {
+      console.group('📝 Creating blog');
+      
+      // Ensure correct fields for backend
+      const safeBlogData = {
+        ...blogData,
+        published: blogData.published !== undefined ? blogData.published : 
+                  (blogData.status === 'published' || false),
+        status: blogData.status || 'draft'
+      };
+      
+      console.log('📦 Sending blog data:', safeBlogData);
+      
       const response = await fetch(`${API_BASE_URL}/blogs`, {
         method: 'POST',
         headers: getAuthHeaders(),
-        body: JSON.stringify(blogData)
+        body: JSON.stringify(safeBlogData)
       });
+      
       const data = await response.json();
-      if (!response.ok) throw new Error(data.error || `HTTP ${response.status}: Failed to create blog`);
+      if (!response.ok) {
+        console.error('❌ Create failed:', data);
+        throw new Error(data.error || `HTTP ${response.status}: Failed to create blog`);
+      }
+      
+      console.log('✅ Blog created:', data.data?._id);
+      
+      // AUTOMATICALLY PROTECT newly created blog from auto-draft
+      if (data.data?._id) {
+        protectBlog(data.data._id, 120000); // Protect for 2 minutes
+        console.log(`🛡️ New blog ${data.data._id} automatically protected`);
+        
+        // Double-check after 10 seconds (when auto-update usually happens)
+        setTimeout(async () => {
+          try {
+            const checkResponse = await fetch(`${API_BASE_URL}/blogs/${data.data._id}`);
+            const checkData = await checkResponse.json();
+            
+            if (checkData.data && !checkData.data.published) {
+              console.warn(`⚠️ Blog ${data.data._id} was auto-changed to draft at 10s! Fixing...`);
+              
+              await fetch(`${API_BASE_URL}/blogs/${data.data._id}`, {
+                method: 'PUT',
+                headers: getAuthHeaders(),
+                body: JSON.stringify({
+                  published: true,
+                  status: 'published',
+                  _autoFixed: Date.now()
+                })
+              });
+              
+              console.log(`✅ Blog ${data.data._id} fixed back to published`);
+            }
+          } catch (err) {
+            console.error('Protection check failed:', err);
+          }
+        }, 10000);
+      }
+      
+      console.groupEnd();
       return data;
+      
     } catch (error) {
       console.error('❌ Error creating blog:', error);
+      console.groupEnd();
       throw error;
     }
   },
@@ -77,7 +202,7 @@ export const blogService = {
     }
   },
 
-  // Fetch single blog by ID - FIXED VERSION
+  // Fetch single blog by ID
   getBlogById: async (id) => {
     try {
       console.log(`📥 Fetching blog ${id} from: ${API_BASE_URL}/blogs/${id}`);
@@ -114,21 +239,53 @@ export const blogService = {
     }
   },
 
-  // Update blog
+  // Update blog - WITH AUTO-DRAFT PROTECTION
   updateBlog: async (id, blogData) => {
     try {
-      // Prepare the payload
+      console.group(`🔄 updateBlog called for ${id}`);
+      console.log('📦 Incoming blogData:', blogData);
+      
+      // Check if this is a problematic update (like from BlogList.js with only isVisible)
+      const isProblematicUpdate = 
+        blogData.isVisible !== undefined && 
+        !blogData.published && 
+        !blogData.status;
+      
+      let finalBlogData = { ...blogData };
+      
+      // Apply protection if blog is protected
+      if (protectedBlogs.has(id) && shouldBlockUpdate(id, blogData)) {
+        console.warn(`🚫 Blocking auto-draft update for protected blog ${id}`);
+        finalBlogData = fixUpdateData(id, blogData);
+        console.log('🔧 Fixed data:', finalBlogData);
+      }
+      // Fix problematic updates even if not protected
+      else if (isProblematicUpdate) {
+        console.warn(`⚠️ Fixing problematic update for blog ${id}`);
+        finalBlogData = {
+          ...blogData,
+          published: blogData.isVisible,
+          status: blogData.isVisible ? 'published' : 'draft'
+        };
+        console.log('🔧 Fixed data:', finalBlogData);
+      }
+      
+      // Prepare the payload - CORRECTED for backend
       const payload = {
-        title: blogData.title || '',
-        content: blogData.content || '',
-        excerpt: blogData.excerpt || '',
-        category: blogData.category || '',
-        tags: blogData.tags || [],
-        imageUrl: blogData.imageUrl || '',
-        isPublished: !!blogData.isPublished
+        title: finalBlogData.title || '',
+        content: finalBlogData.content || '',
+        excerpt: finalBlogData.excerpt || '',
+        category: finalBlogData.category || '',
+        tags: finalBlogData.tags || [],
+        imageUrl: finalBlogData.imageUrl || finalBlogData.image || '',
+        
+        // CORRECT: Use published and status (not isPublished)
+        published: finalBlogData.published !== undefined ? finalBlogData.published : 
+                  (finalBlogData.status === 'published' || finalBlogData.isPublished || true),
+        status: finalBlogData.status || (finalBlogData.published ? 'published' : 'draft')
       };
       
-      console.log(`📤 Updating blog ${id} with:`, payload);
+      console.log('📤 Sending payload:', payload);
       
       const response = await fetch(`${API_BASE_URL}/blogs/${id}`, {
         method: 'PUT',
@@ -137,12 +294,22 @@ export const blogService = {
       });
       
       const data = await response.json();
-      if (!response.ok) throw new Error(data.error || `HTTP ${response.status}: Failed to update blog`);
+      if (!response.ok) {
+        console.error(`❌ Update failed:`, data);
+        throw new Error(data.error || `HTTP ${response.status}: Failed to update blog`);
+      }
       
       console.log(`✅ Blog ${id} updated successfully`);
+      console.log('✅ Response:', { 
+        published: data.data?.published, 
+        status: data.data?.status 
+      });
+      console.groupEnd();
+      
       return data;
     } catch (error) {
       console.error(`❌ Error updating blog ${id}:`, error);
+      console.groupEnd();
       throw error;
     }
   },
@@ -217,6 +384,12 @@ export const blogService = {
       // Success response
       console.log(`✅ Blog ${id} deleted successfully`);
       
+      // Remove from protection if it was protected
+      if (protectedBlogs.has(id)) {
+        protectedBlogs.delete(id);
+        console.log(`🛡️ Removed blog ${id} from protection (deleted)`);
+      }
+      
       // Return consistent success structure
       return {
         success: true,
@@ -240,7 +413,7 @@ export const blogService = {
     }
   },
 
-  // Upload image to backend - FIXED VERSION
+  // Upload image to backend
   uploadImage: async (file) => {
     try {
       console.log('📤 Starting image upload to backend:', {
@@ -324,7 +497,7 @@ export const blogService = {
     }
   },
 
-  // Test upload endpoint - FIXED VERSION
+  // Test upload endpoint
   testUploadEndpoint: async () => {
     try {
       console.log('🔍 Testing upload endpoint...');
@@ -404,7 +577,7 @@ export const blogService = {
     }
   },
 
-  // New: Test if delete endpoint is accessible (for debugging)
+  // Test if delete endpoint is accessible (for debugging)
   testDeleteEndpoint: async (id = 'test') => {
     try {
       console.log(`🔍 Testing delete endpoint for blog ID: ${id}`);
@@ -468,3 +641,54 @@ export const blogService = {
     }
   }
 };
+
+// ============================================
+// 🎯 DEBUGGING UTILITIES (Optional)
+// ============================================
+
+// Monitor a blog for auto-draft changes
+window.monitorBlog = async (blogId, duration = 60000) => {
+  console.log(`👀 Monitoring blog ${blogId} for ${duration/1000}s...`);
+  
+  const startTime = Date.now();
+  let checkCount = 0;
+  
+  const checkStatus = async () => {
+    checkCount++;
+    const elapsed = Date.now() - startTime;
+    
+    try {
+      const response = await fetch(`${API_BASE_URL}/blogs/${blogId}`);
+      const data = await response.json();
+      
+      console.log(`[${checkCount}] ${elapsed/1000}s:`, {
+        published: data.data?.published,
+        status: data.data?.status,
+        updatedAt: data.data?.updatedAt,
+        protected: protectedBlogs.has(blogId)
+      });
+      
+      // Auto-fix if it becomes draft and is protected
+      if (data.data && !data.data.published && protectedBlogs.has(blogId)) {
+        console.log(`⚠️ Auto-fixing draft for protected blog ${blogId}`);
+        await blogService.updateBlog(blogId, {
+          published: true,
+          status: 'published',
+          _monitorFixed: Date.now()
+        });
+      }
+    } catch (error) {
+      console.error(`Check ${checkCount} failed:`, error);
+    }
+    
+    if (elapsed < duration) {
+      setTimeout(checkStatus, 5000);
+    } else {
+      console.log(`👀 Monitoring completed for blog ${blogId}`);
+    }
+  };
+  
+  checkStatus();
+};
+
+console.log('✅ blogService loaded with auto-draft protection system');
