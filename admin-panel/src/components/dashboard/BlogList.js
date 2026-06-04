@@ -1,4 +1,4 @@
-// src/components/dashboard/BlogList.js - FIXED VERSION
+// src/components/dashboard/BlogList.js - UPDATED VERSION
 import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { blogService } from '../../services/blogService';
@@ -369,249 +369,286 @@ const BlogList = () => {
 
   return (
     <div className="blog-list-page">
-      {/* Header */}
-      <div className="blog-list-header">
-        <div>
-          <h1>Blog Posts</h1>
-          <p>{stats.total} published • {stats.visible} on website</p>
-          <div style={{ marginTop: '10px', display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
-            <button 
-              className="btn btn-warning"
-              onClick={fixAllBlogs}
-              disabled={loading}
-              style={{ fontSize: '12px', padding: '5px 10px' }}
-            >
-              🔧 Fix All Blogs (Publish & Show)
-            </button>
-            <button 
-              className="btn btn-info"
-              onClick={() => console.log('Blogs data:', blogs)}
-              style={{ fontSize: '12px', padding: '5px 10px' }}
-            >
-              📊 Debug Data
-            </button>
-          </div>
-        </div>
-        <button 
-          className="btn btn-primary"
-          onClick={() => navigate('/admin/blogs/new')}
-          disabled={loading}
-        >
-          + Create New Post
-        </button>
-      </div>
-
-      {/* Stats Cards */}
-      <div className="stats-grid">
-        <div className="stat-card">
-          <div className="stat-icon">📊</div>
-          <div className="stat-info">
-            <h3>{stats.total}</h3>
-            <p>Total Posts</p>
-          </div>
-        </div>
-        <div className="stat-card stat-published">
-          <div className="stat-icon">📝</div>
-          <div className="stat-info">
-            <h3>{stats.published}</h3>
-            <p>Published</p>
-          </div>
-        </div>
-        <div className="stat-card stat-draft">
-          <div className="stat-icon">✏️</div>
-          <div className="stat-info">
-            <h3>{stats.drafts}</h3>
-            <p>Drafts</p>
-          </div>
-        </div>
-        <div className="stat-card stat-visible">
-          <div className="stat-icon">👁️</div>
-          <div className="stat-info">
-            <h3>{stats.visible}</h3>
-            <p>Visible on Site</p>
-          </div>
-        </div>
-        <div className="stat-card stat-hidden">
-          <div className="stat-icon">🚫</div>
-          <div className="stat-info">
-            <h3>{stats.hidden}</h3>
-            <p>Hidden</p>
-          </div>
-        </div>
-      </div>
-
-      {/* Action Bar */}
-      <div className="action-bar">
-        <div className="search-box">
-          <input
-            type="text"
-            placeholder="Search blogs..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="search-input"
-            disabled={loading}
-          />
-          <span className="search-icon">🔍</span>
-        </div>
-        
-        <div className="filters">
-          <select
-            value={statusFilter}
-            onChange={(e) => setStatusFilter(e.target.value)}
-            className="filter-select"
-            disabled={loading}
-          >
-            <option value="all">All Status</option>
-            <option value="published">Published</option>
-            <option value="drafts">Drafts</option>
-            <option value="visible">Visible</option>
-            <option value="hidden">Hidden</option>
-          </select>
-        </div>
-      </div>
-
-      {/* Blog Table */}
-      <div className="blog-table-container">
-        <table className="blog-table">
-          <thead>
-            <tr>
-              <th width="40">
-                <input
-                  type="checkbox"
-                  checked={selectedBlogs.length === filteredBlogs.length && filteredBlogs.length > 0}
-                  onChange={toggleSelectAll}
-                  className="select-all-checkbox"
+      <div className="blog-list-container">
+        {/* Header */}
+        <div className="blog-list-header">
+          <div className="header-content">
+            <div className="header-title">
+              <h1>Blog Posts</h1>
+              <p>{stats.total} published • {stats.visible} on website</p>
+              <div style={{ marginTop: '10px', display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
+                <button 
+                  className="btn btn-warning"
+                  onClick={fixAllBlogs}
                   disabled={loading}
-                />
-              </th>
-              <th>Title</th>
-              <th width="120">Status</th>
-              <th width="120">Frontend</th>
-              <th width="120">Created</th>
-              <th width="220">Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {filteredBlogs.length === 0 ? (
-              <tr>
-                <td colSpan="6" className="no-data">
-                  📭 No blogs found. Create your first blog post!
-                </td>
-              </tr>
-            ) : (
-              filteredBlogs.slice((page - 1) * 10, page * 10).map(blog => (
-                <tr key={blog._id} className={selectedBlogs.includes(blog._id) ? 'selected' : ''}>
-                  <td>
+                  style={{ fontSize: '12px', padding: '5px 10px' }}
+                >
+                  🔧 Fix All Blogs (Publish & Show)
+                </button>
+                <button 
+                  className="btn btn-info"
+                  onClick={() => console.log('Blogs data:', blogs)}
+                  style={{ fontSize: '12px', padding: '5px 10px' }}
+                >
+                  📊 Debug Data
+                </button>
+              </div>
+            </div>
+            {/* Create button removed from header */}
+          </div>
+        </div>
+
+        {/* Stats Cards */}
+        <div className="stats-section">
+          <div className="stats-grid">
+            <div className="stat-card total">
+              <div className="stat-icon">📊</div>
+              <div className="stat-info">
+                <h3>{stats.total}</h3>
+                <p>Total Posts</p>
+              </div>
+            </div>
+            <div className="stat-card published">
+              <div className="stat-icon">📝</div>
+              <div className="stat-info">
+                <h3>{stats.published}</h3>
+                <p>Published</p>
+              </div>
+            </div>
+            <div className="stat-card drafts">
+              <div className="stat-icon">✏️</div>
+              <div className="stat-info">
+                <h3>{stats.drafts}</h3>
+                <p>Drafts</p>
+              </div>
+            </div>
+            <div className="stat-card visible">
+              <div className="stat-icon">👁️</div>
+              <div className="stat-info">
+                <h3>{stats.visible}</h3>
+                <p>Visible on Site</p>
+              </div>
+            </div>
+            <div className="stat-card hidden">
+              <div className="stat-icon">🚫</div>
+              <div className="stat-info">
+                <h3>{stats.hidden}</h3>
+                <p>Hidden</p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Control Bar with Search, Filter, and Create Button */}
+        <div className="control-bar">
+          <div className="search-container">
+            <input
+              type="text"
+              placeholder="Search blogs..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="search-input"
+              disabled={loading}
+            />
+            <span className="search-icon">🔍</span>
+          </div>
+          
+          <div className="filter-create-container">
+            <div className="filter-controls">
+              <select
+                value={statusFilter}
+                onChange={(e) => setStatusFilter(e.target.value)}
+                className="filter-select"
+                disabled={loading}
+              >
+                <option value="all">All Status</option>
+                <option value="published">Published</option>
+                <option value="drafts">Drafts</option>
+                <option value="visible">Visible</option>
+                <option value="hidden">Hidden</option>
+              </select>
+            </div>
+            
+            <button 
+              className="create-btn-inline"
+              onClick={() => navigate('/admin/blogs/new')}
+              disabled={loading}
+            >
+              <i>+</i> Create New Post
+            </button>
+          </div>
+        </div>
+
+        {/* Blog Table */}
+        <div className="table-section">
+          <div className="blog-table-container">
+            <table className="blog-table">
+              <thead>
+                <tr>
+                  <th>
                     <input
                       type="checkbox"
-                      checked={selectedBlogs.includes(blog._id)}
-                      onChange={() => toggleBlogSelection(blog._id)}
-                      className="blog-checkbox"
+                      checked={selectedBlogs.length === filteredBlogs.length && filteredBlogs.length > 0}
+                      onChange={toggleSelectAll}
+                      className="select-checkbox"
                       disabled={loading}
                     />
-                  </td>
-                  <td>
-                    <div className="blog-title-cell">
-                      <h4>{blog.title || 'Untitled'}</h4>
-                      <p className="blog-excerpt">
-                        {blog.excerpt?.substring(0, 100) || 'No excerpt...'}
-                      </p>
-                    </div>
-                  </td>
-                  <td>
-                    <span className={`status-badge ${blog.isPublished ? 'published' : 'draft'}`}>
-                      {blog.isPublished ? 'published' : 'draft'}
-                    </span>
-                  </td>
-                  <td>
-                    <span className={`visibility-badge ${blog.isVisible ? 'visible' : 'hidden'}`}>
-                      {blog.isVisible ? '✅ Visible' : '🚫 Hidden'}
-                    </span>
-                  </td>
-                  <td>
-                    <span className="blog-date">
-                      {blog.formattedDate}
-                    </span>
-                  </td>
-                  <td>
-                    <div className="action-buttons">
-                      <button
-                        className="btn-action view"
-                        onClick={() => window.open(`/blog/${blog._id}`, '_blank')}
-                        title="View on website"
-                        disabled={loading}
-                      >
-                        👁️ View
-                      </button>
-                      <button
-                        className="btn-action edit"
-                        onClick={() => navigate(`/admin/blogs/edit/${blog._id}`)}
-                        title="Edit blog"
-                        disabled={loading}
-                      >
-                        ✏️ Edit
-                      </button>
-                      <button
-                        className="btn-action publish"
-                        onClick={() => handlePublish(blog._id)}
-                        title={blog.isPublished ? 'Unpublish' : 'Publish'}
-                        disabled={loading}
-                      >
-                        {blog.isPublished ? '📕 Unpublish' : '📗 Publish'}
-                      </button>
-                      <button
-                        className={`btn-action ${blog.isVisible ? 'hide' : 'show'}`}
-                        onClick={() => {
-                          setBlogToToggle(blog);
-                          setShowVisibilityModal(true);
-                        }}
-                        title={blog.isVisible ? 'Hide from website' : 'Show on website'}
-                        disabled={loading}
-                      >
-                        {blog.isVisible ? '🚫 Hide' : '✅ Show'}
-                      </button>
-                      <button
-                        className="btn-action delete"
-                        onClick={() => {
-                          setBlogToDelete(blog);
-                          setShowDeleteModal(true);
-                        }}
-                        title="Delete blog"
-                        disabled={loading}
-                      >
-                        🗑️ Delete
-                      </button>
-                    </div>
-                  </td>
+                  </th>
+                  <th>Title</th>
+                  <th>Status</th>
+                  <th>Frontend</th>
+                  <th>Created</th>
+                  <th>Actions</th>
                 </tr>
-              ))
-            )}
-          </tbody>
-        </table>
-      </div>
-
-      {/* Pagination */}
-      {filteredBlogs.length > 0 && (
-        <div className="pagination">
-          <button 
-            className="btn btn-secondary"
-            onClick={() => setPage(prev => Math.max(prev - 1, 1))}
-            disabled={page === 1 || loading}
-          >
-            ← Previous
-          </button>
-          <span className="page-info">
-            Page {page} of {Math.ceil(filteredBlogs.length / 10)}
-          </span>
-          <button 
-            className="btn btn-secondary"
-            onClick={() => setPage(prev => Math.min(prev + 1, Math.ceil(filteredBlogs.length / 10)))}
-            disabled={page === Math.ceil(filteredBlogs.length / 10) || loading}
-          >
-            Next →
-          </button>
+              </thead>
+              <tbody>
+                {filteredBlogs.length === 0 ? (
+                  <tr>
+                    <td colSpan="6" className="empty-state">
+                      <div className="empty-icon">📭</div>
+                      <h3>No blogs found</h3>
+                      <p>Create your first blog post to get started!</p>
+                      <div className="empty-actions">
+                        <button 
+                          className="create-btn-inline"
+                          onClick={() => navigate('/admin/blogs/new')}
+                          disabled={loading}
+                        >
+                          <i>+</i> Create New Post
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ) : (
+                  filteredBlogs.slice((page - 1) * 10, page * 10).map(blog => (
+                    <tr key={blog._id} className={selectedBlogs.includes(blog._id) ? 'selected' : ''}>
+                      <td>
+                        <input
+                          type="checkbox"
+                          checked={selectedBlogs.includes(blog._id)}
+                          onChange={() => toggleBlogSelection(blog._id)}
+                          className="select-checkbox"
+                          disabled={loading}
+                        />
+                      </td>
+                      <td>
+                        <div className="blog-title-cell">
+                          <h4>{blog.title || 'Untitled'}</h4>
+                          <p className="blog-excerpt">
+                            {blog.excerpt?.substring(0, 100) || 'No excerpt...'}
+                          </p>
+                        </div>
+                      </td>
+                      <td>
+                        <span className={`status-badge ${blog.isPublished ? 'published' : 'draft'}`}>
+                          {blog.isPublished ? 'published' : 'draft'}
+                        </span>
+                      </td>
+                      <td>
+                        <span className={`visibility-badge ${blog.isVisible ? 'visible' : 'hidden'}`}>
+                          {blog.isVisible ? '✅ Visible' : '🚫 Hidden'}
+                        </span>
+                      </td>
+                      <td>
+                        <span className="blog-date">
+                          {blog.formattedDate}
+                        </span>
+                      </td>
+                      <td>
+                        <div className="action-buttons">
+                          <button
+                            className="action-button view"
+                            onClick={() => window.open(`/blog/${blog._id}`, '_blank')}
+                            title="View on website"
+                            disabled={loading}
+                          >
+                            <span>👁️ View</span>
+                          </button>
+                          <button
+                            className="action-button edit"
+                            onClick={() => navigate(`/admin/blogs/edit/${blog._id}`)}
+                            title="Edit blog"
+                            disabled={loading}
+                          >
+                            <span>✏️ Edit</span>
+                          </button>
+                          <button
+                            className="action-button publish"
+                            onClick={() => handlePublish(blog._id)}
+                            title={blog.isPublished ? 'Unpublish' : 'Publish'}
+                            disabled={loading}
+                          >
+                            <span>{blog.isPublished ? '📕 Unpublish' : '📗 Publish'}</span>
+                          </button>
+                          <button
+                            className={`action-button ${blog.isVisible ? 'hide' : 'show'}`}
+                            onClick={() => {
+                              setBlogToToggle(blog);
+                              setShowVisibilityModal(true);
+                            }}
+                            title={blog.isVisible ? 'Hide from website' : 'Show on website'}
+                            disabled={loading}
+                          >
+                            <span>{blog.isVisible ? '🚫 Hide' : '✅ Show'}</span>
+                          </button>
+                          <button
+                            className="action-button delete"
+                            onClick={() => {
+                              setBlogToDelete(blog);
+                              setShowDeleteModal(true);
+                            }}
+                            title="Delete blog"
+                            disabled={loading}
+                          >
+                            <span>🗑️ Delete</span>
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
         </div>
-      )}
+
+        {/* Pagination */}
+        {filteredBlogs.length > 0 && (
+          <div className="pagination-section">
+            <div className="pagination-info">
+              Showing {Math.min((page - 1) * 10 + 1, filteredBlogs.length)} to {Math.min(page * 10, filteredBlogs.length)} of {filteredBlogs.length} blogs
+            </div>
+            <div className="pagination-controls">
+              <button 
+                className="pagination-button"
+                onClick={() => setPage(prev => Math.max(prev - 1, 1))}
+                disabled={page === 1 || loading}
+              >
+                ← Previous
+              </button>
+              <div className="page-numbers">
+                {Array.from({ length: Math.ceil(filteredBlogs.length / 10) }, (_, i) => i + 1).map(num => (
+                  <button
+                    key={num}
+                    className={`page-number ${page === num ? 'active' : ''}`}
+                    onClick={() => setPage(num)}
+                    disabled={loading}
+                  >
+                    {num}
+                  </button>
+                ))}
+              </div>
+              <button 
+                className="pagination-button"
+                onClick={() => setPage(prev => Math.min(prev + 1, Math.ceil(filteredBlogs.length / 10)))}
+                disabled={page === Math.ceil(filteredBlogs.length / 10) || loading}
+              >
+                Next →
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
 
       {/* Delete Confirmation Modal */}
       {showDeleteModal && blogToDelete && (
@@ -625,7 +662,7 @@ const BlogList = () => {
             </div>
             <div className="modal-body">
               <p>Are you sure you want to delete this blog?</p>
-              <div className="blog-to-delete">
+              <div className="blog-details">
                 <strong>{blogToDelete.title}</strong>
                 <p>ID: {blogToDelete._id}</p>
                 <p>This action cannot be undone!</p>
@@ -667,7 +704,7 @@ const BlogList = () => {
                   ? 'This blog will be hidden from the public website.'
                   : 'This blog will be visible on the public website.'}
               </p>
-              <div className="blog-to-toggle">
+              <div className="blog-details">
                 <strong>{blogToToggle.title}</strong>
                 <p>Current: {blogToToggle.isVisible ? 'Visible' : 'Hidden'}</p>
               </div>
@@ -695,4 +732,4 @@ const BlogList = () => {
   );
 };
 
-export default BlogList;
+export default BlogList;  
